@@ -34,6 +34,8 @@ It is built as one self-contained `index.html`: no server, no build tooling, no 
 - **Paste text or a chat export** and read it as a document
 - **Manual entry** with an empty editable table
 - **Duplicate detection** using SHA-256, so the same file is not imported twice
+- **Progressive reading:** long PDFs open as soon as the first tables are found, with a live page counter, while the rest is read in the background
+- **Instant re-import of Sijill PDFs:** exported PDFs carry their own data, so they load without OCR
 - **Section picker:** when a file contains several tables or sheets, choose which sections to keep before they are imported
 
 ### Sections (tables inside a document)
@@ -62,6 +64,8 @@ It is built as one self-contained `index.html`: no server, no build tooling, no 
 - **Manual rate overrides** are clearly marked, logged, and ask for confirmation if they deviate sharply from the live rate
 
 ### Export
+Exports run in the background with a progress indicator and a cancel button, so the app stays usable.
+
 | Format | Notes |
 |---|---|
 | **XLSX** | One sheet per table plus an Info sheet, frozen header, RTL-aware |
