@@ -118,8 +118,8 @@ input.in{width:100%}
 .ui{width:40px;height:40px;border-radius:12px;background:var(--sf2);display:grid;place-items:center;color:var(--mu);flex:none;transition:background .3s,color .3s}
 .up[data-s=d] .ui{background:var(--ac2);color:var(--ac)}
 .up[data-s=e] .ui{color:var(--er)}
-.ub{flex:1;min-width:0;display:grid;gap:6px}
-.un{display:flex;gap:10px;align-items:baseline;justify-content:space-between}
+.ub{flex:1;min-width:0;display:grid;grid-template-columns:minmax(0,1fr);gap:6px}
+.un{display:flex;gap:10px;align-items:baseline;justify-content:space-between;min-width:0}
 .un b{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .un span{flex:none}
 .pb{height:5px;border-radius:5px;background:var(--sf2);overflow:hidden;position:relative}
@@ -268,6 +268,14 @@ input,select,textarea,.in,.sbox input{font-size:16px}
 .btn[disabled]{opacity:.4;pointer-events:none}
 .cmp{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:16px}
 .cmp .card{min-width:0}
+.app{overflow-x:clip}
+.pg,.card{min-width:0}
+.up .btn{flex:none}
+#bz{position:fixed;inset-inline:12px;bottom:calc(168px + env(safe-area-inset-bottom));margin:auto;width:max-content;max-width:calc(100% - 24px);z-index:60;display:flex;align-items:center;gap:12px;padding:10px 12px 10px 16px;border-radius:16px;background:var(--sf);border:1px solid var(--ln);box-shadow:0 10px 30px #0002;font-size:14px;animation:up .25s}
+#bz .bzp{min-width:40px;text-align:end;color:var(--mu);font-variant-numeric:tabular-nums}
+#bz .btn{min-height:36px;padding:0 12px}
+.rdb{display:flex;align-items:center;gap:10px;margin:0 0 12px;padding:10px 14px;border-radius:12px;background:var(--ac2);color:var(--ac);font-size:14px}
+.rdb .spin{flex:none}
 </style>
 </head>
 <body>
@@ -309,7 +317,7 @@ const dbDel=(st,k)=>dbOp(st,'readwrite',s=>s.delete(k));
 const dbClr=st=>dbOp(st,'readwrite',s=>s.clear());
 const stFail=e=>{console.warn(e);toast(e&&e.name==='QuotaExceededError'?'Storage is full':t('noStore'))};
 function syncSheet(d){const s=d.sheets[d.si];if(s){s.kr=d.kr;s.rows=d.rows;s.cols=d.cols}}
-function saveDoc(d){if(!DB)return Promise.resolve();syncSheet(d);const c={...d};delete c.cols;delete c.rows;delete c.kr;return dbPut('docs',c).catch(stFail).then(stU)}
+function saveDoc(d){if(!DB)return Promise.resolve();syncSheet(d);const c={...d};delete c.cols;delete c.rows;delete c.kr;delete c.reading;delete c.rp;return dbPut('docs',c).catch(stFail).then(stU)}
 let lgT=0;function log(m){logs.unshift({m,t:Date.now()});logs=logs.slice(0,40);clearTimeout(lgT);lgT=setTimeout(()=>dbPut('kv',logs,'logs').catch(()=>{}),400)}
 async function stU(){const el=$('#stor');if(!el)return;let u='';try{const e=await navigator.storage.estimate();u=' · '+fsz(e.usage||0)}catch(x){}el.textContent=t('stored')+u}
 /* ---------- libraries are loaded only when needed ---------- */
@@ -416,18 +424,20 @@ function readText(text){const lines=text.replace(/\r/g,'').split('\n'),wa=parseW
 if(wa)return{sheets:[wa],text:lines.filter(l=>l.trim()),src:'chat',review:false,info:{},ccy:detCcy(text)};
 return{sheets:tablesFromText(lines).map((s,i,a)=>({...s,name:s.name||(a.length>1?`Table ${i+1}`:'Table')})),text:lines.map(l=>l.trimEnd()).filter(Boolean),review:true,info:{},ccy:detCcy(text)}}
 /* PDF */
-async function readPdf(buf,u,force){const lb=await lib('pdf');if(!lb.GlobalWorkerOptions.workerSrc)lb.GlobalWorkerOptions.workerSrc=PDFW;
+async function readPdf(buf,u,force,onPart){const lb=await lib('pdf');if(!lb.GlobalWorkerOptions.workerSrc)lb.GlobalWorkerOptions.workerSrc=PDFW;
 let pdf;try{pdf=await lb.getDocument({data:new Uint8Array(buf.slice(0)),isEvalSupported:false,enableXfa:false}).promise}catch(e){throw E(e&&e.name==='PasswordException'?'pwd':'pdfbad')}
-const n=Math.min(pdf.numPages,60),info={pages:pdf.numPages,ocr:0,conf:null};if(pdf.numPages>n)info.part=true;const pages=[],confs=[];
-for(let i=1;i<=n;i++){setU(u,'rd',.12+.6*(i-1)/n);const pg=await pdf.getPage(i);let words=[];
+if(!force){try{const md=await pdf.getMetadata(),inf=md&&md.info;if(inf&&inf.Subject==='sijill-data:v1'&&inf.Keywords){const rr=await sijillData(String(inf.Keywords),pdf.numPages);if(rr){setU(u,'ext',.9);return rr}}}catch(e){console.warn(e)}}
+const n=Math.min(pdf.numPages,60),info={pages:pdf.numPages,ocr:0,conf:null};if(pdf.numPages>n)info.part=true;const pages=[],confs=[];let lastE=0;
+for(let i=1;i<=n;i++){u.pgBase=i-1;u.pgN=n;u.sub=i+'/'+n;setU(u,'rd',.12+.8*(i-1)/n);const pg=await pdf.getPage(i);let words=[];
 if(!force){const tc=await pg.getTextContent();words=tc.items.filter(x=>x.str&&x.str.trim()).map(x=>({s:x.str,x0:x.transform[4],x1:x.transform[4]+x.width,yc:-x.transform[5],h:Math.abs(x.transform[3])||x.height||10}))}
 if(force||words.reduce((a,w)=>a+w.s.length,0)<25){if(info.ocr>=12){info.ocrCap=true;pages.push([]);continue}const vp0=pg.getViewport({scale:1}),sc=Math.min(3,Math.max(1.5,1800/vp0.width)),vp=pg.getViewport({scale:sc}),cv=document.createElement('canvas');cv.width=Math.round(vp.width);cv.height=Math.round(vp.height);const cx=cv.getContext('2d');cx.fillStyle='#fff';cx.fillRect(0,0,cv.width,cv.height);await pg.render({canvasContext:cx,viewport:vp,canvas:cv}).promise;const r=await ocrWords(cv,u);words=r.words;if(r.conf!=null)confs.push(r.conf);info.ocr++}
-pages.push(linesFromWords(words))}
+pages.push(linesFromWords(words));if(onPart&&i<n&&performance.now()-lastE>1100){lastE=performance.now();try{const pr=fromLines(pages.slice(),{...info});if(pr.sheets.length)await onPart(pr,{a:i,b:n})}catch(e){console.warn(e)}}}
+u.pgN=0;u.sub='';
 if(confs.length)info.conf=Math.round(confs.reduce((a,b)=>a+b,0)/confs.length);
 const r=fromLines(pages,info);if(!r.text.length)throw E('noText');return r}
 /* OCR */
 let OCRW=null,OCRL=null;
-async function ocrWords(cv,u){const T=await lib('ocr');setU(u,'ocrp',.72);OCRL=m=>{if(m.status==='recognizing text')setU(u,'ocr',.75+.2*(m.progress||0));else setU(u,'ocrp',.72+.03*(m.progress||0))};
+async function ocrWords(cv,u){const T=await lib('ocr'),pgp=x=>u.pgN?.12+.8*((u.pgBase+x)/u.pgN):null;setU(u,'ocrp',pgp(0)??.72);OCRL=m=>{if(m.status==='recognizing text')setU(u,'ocr',pgp(m.progress||0)??.75+.2*(m.progress||0));else setU(u,'ocrp',pgp(0)??.72+.03*(m.progress||0))};
 if(!OCRW)OCRW=await T.createWorker(['eng','ara'],1,{logger:m=>OCRL&&OCRL(m)});
 const r=await OCRW.recognize(cv),d=r.data;let ws=d.words;if(!ws&&d.blocks)ws=d.blocks.flatMap(b=>b.paragraphs.flatMap(p=>p.lines.flatMap(l=>l.words)));
 ws=(ws||[]).filter(w=>w.text&&w.text.trim()&&(w.confidence==null||w.confidence>=30)).map(w=>({s:w.text.trim(),x0:w.bbox.x0,x1:w.bbox.x1,yc:(w.bbox.y0+w.bbox.y1)/2,h:Math.max(4,w.bbox.y1-w.bbox.y0)}));return{words:ws,conf:d.confidence!=null?Math.round(d.confidence):null}}
@@ -470,7 +480,7 @@ function numColsOf(cols,rows){const o=[];cols.forEach((_,i)=>{if(!i||!rows.lengt
 const numCols=d=>numColsOf(d.cols,d.rows);
 function rowVal(d,r){const nc=numCols(d);if(d.kr!=null&&d.agg==='sum')return nc.reduce((s,i)=>s+(+r[i]||0),0);if(d.kr!=null)return +r[nc[0]]||0;return +r[nc[nc.length-1]]||0}
 function keyInfo(d){const nc=numCols(d);if(!nc.length)return null;if(d.kr!=null&&d.rows[d.kr]){const r=d.rows[d.kr],lb=String(L(r[0])||'');if(d.agg==='sum')return{label:lb,val:nc.reduce((s,i)=>s+(+r[i]||0),0)};return{label:lb+' · '+L(d.cols[nc[0]]),val:+r[nc[0]]||0}}const i=nc[nc.length-1];return{label:String(L(d.cols[i])),val:d.rows.reduce((s,r)=>s+(+r[i]||0),0)}}
-function caps(d){const n=numCols(d).length>0,ok=d.status!=='review';return{table:1,edit:1,chart:n&&ok,summary:n&&ok,present:n&&ok,why:!ok?t('whyConf'):!n?t('whyNum'):''}}
+function caps(d){const n=numCols(d).length>0,ok=d.status!=='review';return{table:1,edit:1,chart:n&&ok,summary:n&&ok,present:n&&ok,why:!ok?t('whyConf'):!n?t(d.sheets&&d.sheets.length>1?'whySec':'whyNum'):''}}
 function chartData(d){const nc=numCols(d),RR=d.rows.filter(r=>!isTot(r)&&nc.some(i=>isN(r[i]))),rws=RR.length>=2?RR:d.rows,labels=rws.map(r=>String(L(r[0])||''));if(d.kr!=null&&d.agg==='sum')return{labels,sets:nc.map(i=>({l:String(L(d.cols[i])),d:rws.map(r=>+r[i]||0)}))};if(d.kr!=null)return{labels,sets:nc.slice(0,3).map(i=>({l:String(L(d.cols[i])),d:rws.map(r=>+r[i]||0)}))};const i=nc[nc.length-1];return{labels,sets:[{l:String(L(d.cols[i])),d:rws.map(r=>+r[i]||0)}]}}
 const TOT=/^(grand\s+)?total|الإجمالي|إجمالي|المجموع/i,isTot=r=>TOT.test(String(L(r[0])).trim());
 function sumLines(d){const k=keyInfo(d),nc=numCols(d),li=nc[nc.length-1];const rv=d.rows.filter(r=>!isTot(r)&&nc.some(i=>isN(r[i]))).map(r=>({l:String(L(r[0])||''),v:rowVal(d,r)})).sort((a,b)=>b.v-a.v);const o=[`${k.label}: ${fmt(k.val)} ${d.ccy} (≈ ${fmt(conv(k.val,d.ccy))} ${S.base})`];if(rv.length>1){o.push(`${t('high')}: ${rv[0].l} (${fmt(rv[0].v)})`);o.push(`${t('low')}: ${rv[rv.length-1].l} (${fmt(rv[rv.length-1].v)})`)}
@@ -497,7 +507,10 @@ p.onkeydown=e=>{const a=[...p.querySelectorAll('.pm button')],i=a.indexOf(docume
 (p.querySelector('.on')||p.querySelector('.pm button')).focus()}
 function closeDD(nf){const p=$('#pop');if(p)p.remove();if(ddB){ddB.setAttribute('aria-expanded','false');if(!nf&&document.contains(ddB))ddB.focus();ddB=null}}
 function askC(msg,yes,no,yl){const e=document.createElement('div');e.className='md';e.style.zIndex=80;e.setAttribute('role','alertdialog');e.setAttribute('aria-modal','true');e.innerHTML=`<div class="mdc"><p>${esc(msg)}</p><div class="row" style="margin-top:18px;justify-content:flex-end"><button class="btn g" id="acn">${t('cancel')}</button><button class="btn" id="acy">${yl||t('useIt')}</button></div></div>`;document.body.appendChild(e);e.querySelector('#acy').onclick=()=>{e.remove();yes()};e.querySelector('#acn').onclick=()=>{e.remove();no&&no()};e.querySelector('#acn').focus()}
-function busy(on){let e=$('#busy');if(!on){if(e)e.remove();return}if(!e){e=document.createElement('div');e.id='busy';e.setAttribute('role','status');e.innerHTML=`<div class="bx"><span class="spin"></span><span>${t('exporting')}</span></div>`;document.body.appendChild(e)}}
+let BZ=null,EXPB=false;
+function busy(on,bz,cancelable){let e=$('#bz');if(!on){BZ=null;if(e)e.remove();return}BZ=bz||{};if(!e){e=document.createElement('div');e.id='bz';e.setAttribute('role','status');e.innerHTML=`<span class="spin"></span><span class="bzt">${t('exporting')}</span><span class="bzp"></span>${cancelable?`<button type="button" class="btn g" onclick="busyX()">${t('bzCancel')}</button>`:''}`;document.body.appendChild(e)}}
+const busyP=p=>{const e=$('#bz .bzp');if(e)e.textContent=Math.round(Math.max(0,Math.min(1,p))*100)+'%'};
+function busyX(){if(BZ)BZ.cancel=true;const e=$('#bz .bzt');if(e)e.textContent=t('bzCancelling')}
 /* ---------- shell ---------- */
 function render(){const h=document.documentElement;h.lang=S.lang;h.dir=S.lang==='ar'?'rtl':'ltr';h.dataset.t=S.theme;const mt=document.querySelector('meta[name=theme-color]');if(mt)mt.content=S.theme==='dark'?'#0D1312':'#F5F7F6';const nm_=S.lang==='ar'?'سجل':'Sijill';
 reg('lang',[['en','English'],['ar','العربية']],S.lang,v=>{S.lang=v;save();render()});
@@ -564,27 +577,28 @@ ${first?`<div class="row" style="margin-top:26px;gap:12px"><span class="mu sm" s
 /* ---------- uploads with real progress ---------- */
 let upid=0,UP=[];
 const CK='<svg class="ic ck" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
-function upRow(u){const dn=u.done&&!u.err&&!u.dup,pc=Math.round((u.p||0)*100),s=u.err?'e':u.dup?'w':dn?'d':'a',lab=u.err?u.msg:u.dup?t('dupT'):dn?t('done'):t(u.lbl)+' · '+pc+'%',tg=u.doc||u.dup;
-return`<div class="up" id="u${u.id}" data-s="${s}"><span class="ui">${dn?CK:ic(u.err?'x':u.dup?'info':SI[u.ik]||'file')}</span><div class="ub"><div class="un"><b>${esc(u.name)}</b><span class="mu sm">${fsz(u.size)}</span></div><div class="pb"><i style="width:${s==='a'?pc:100}%"></i></div><div class="mu sm us" aria-live="polite">${esc(lab)}</div></div>${(dn||u.dup)&&tg?`<button class="btn g" onclick="openDoc(${tg.id})">${t('open')}</button>`:''}</div>`}
+function upRow(u){const dn=u.done&&!u.err&&!u.dup,pc=Math.round((u.p||0)*100),s=u.err?'e':u.dup?'w':dn?'d':'a',lab=u.err?u.msg:u.dup?t('dupT'):dn?t('done'):t(u.lbl)+(u.sub?' · '+u.sub:'')+' · '+pc+'%',tg=u.doc||u.dup;
+return`<div class="up" id="u${u.id}" data-s="${s}"><span class="ui">${dn?CK:ic(u.err?'x':u.dup?'info':SI[u.ik]||'file')}</span><div class="ub"><div class="un"><b>${esc(u.name)}</b><span class="mu sm">${fsz(u.size)}</span></div><div class="pb"><i style="width:${s==='a'?pc:100}%"></i></div><div class="mu sm us" aria-live="polite">${esc(lab)}</div></div>${(dn||u.dup||u.early)&&tg&&!u.err?`<button class="btn g" onclick="openDoc(${tg.id})">${t('open')}</button>`:''}</div>`}
 function upList(){const c=$('#upc'),e=$('#ups');if(!c||!e)return;c.style.display=UP.length?'block':'none';e.innerHTML=UP.slice(0,6).map(upRow).join('')}
-function updU(u){const e=document.getElementById('u'+u.id);if(!e)return;if(u.done||u.err||u.dup){e.outerHTML=upRow(u);return}const pc=Math.round((u.p||0)*100);e.querySelector('.pb i').style.width=pc+'%';e.querySelector('.us').textContent=t(u.lbl)+' · '+pc+'%'}
+function updU(u){const e=document.getElementById('u'+u.id);if(!e)return;if(u.done||u.err||u.dup){e.outerHTML=upRow(u);return}const pc=Math.round((u.p||0)*100);e.querySelector('.pb i').style.width=pc+'%';e.querySelector('.us').textContent=t(u.lbl)+(u.sub?' · '+u.sub:'')+' · '+pc+'%'}
 function setU(u,l,p){u.lbl=l;u.p=Math.max(u.p||0,p);updU(u)}
 function onFiles(list){const a=[...(list||[])];if(!a.length)return;if(S.tab!=='add'){drawer(0);S.tab='add';view()}a.forEach((f,i)=>setTimeout(()=>ingest(f,a.length===1),i*140))}
 function ingest(f,solo){const u={id:++upid,name:f.name,size:f.size,p:0,lbl:'recv'},cat=S.ac,ccy=S.accy;UP.unshift(u);if(S.tab==='add')upList();
-return(async()=>{try{setU(u,'recv',.04);if(f.size===0)throw E('empty');if(f.size>MAXB)throw E('big');const buf=await f.arrayBuffer();setU(u,'recv',.1);
+return(async()=>{let d0=null;try{setU(u,'recv',.04);if(f.size===0)throw E('empty');if(f.size>MAXB)throw E('big');const buf=await f.arrayBuffer();setU(u,'recv',.1);
 const hash=(await sha(buf))||`${f.size}:${f.name}`,dup=D.find(d=>d.hash===hash);if(dup){u.dup=dup;updU(u);return}
-const k=await sniff(buf,f);u.ik=k.k;if(k.k==='heic')throw E('heic');setU(u,'rd',.12);let r;
-if(k.k==='pdf')r=await readPdf(buf,u);else if(k.k==='image')r=await readImage(f,u);else if(k.k==='xlsx')r=await readXlsx(k.z);else if(k.k==='docx')r=await readDocx(k.z);else if(k.k==='pptx')r=await readPptx(k.z);else if(k.k==='csv')r=readCsv(buf);else r=readText(decodeText(buf));
-setU(u,'ext',.97);if(!r.sheets.length&&!(r.text&&r.text.length))throw E('noData');
+const k=await sniff(buf,f);u.ik=k.k;if(k.k==='heic')throw E('heic');setU(u,'rd',.12);let r;const part=async(pr,pos)=>{if(d0){applyPart(d0,pr,pos);return}d0=mkDoc(f,k,pr,cat,ccy);d0.hash=hash;d0.reading=true;d0.rp=pos;await pushDoc(d0,f);u.doc=d0;u.early=true;const e=document.getElementById('u'+u.id);if(e)e.outerHTML=upRow(u);if(solo)setTimeout(()=>{if(S.tab==='add'&&d0&&S.doc!==d0)openDoc(d0.id)},RM?0:500)};
+if(k.k==='pdf')r=await readPdf(buf,u,false,part);else if(k.k==='image')r=await readImage(f,u);else if(k.k==='xlsx')r=await readXlsx(k.z);else if(k.k==='docx')r=await readDocx(k.z);else if(k.k==='pptx')r=await readPptx(k.z);else if(k.k==='csv')r=readCsv(buf);else r=readText(decodeText(buf));
+setU(u,'ext',.97);if(d0){await finishDoc(d0,r);u.done=true;u.p=1;u.sub='';updU(u);toast(t('rdDone').replace('{n}',d0.sheets.length));return}
+if(!r.sheets.length&&!(r.text&&r.text.length))throw E('noData');
 if(r.sheets.length>1){setU(u,'pick',.97);const pk=await pickImport(f.name,r.sheets);if(!pk)throw E('cancel');r.sheets=pk}
 const d=mkDoc(f,k,r,cat,ccy);d.hash=hash;await pushDoc(d,f);u.doc=d;u.done=true;u.p=1;updU(u);toast(t('imported'));
 if(solo)setTimeout(()=>{if(S.tab==='add')openDoc(d.id)},RM?0:900)}
-catch(e){u.err=true;const key='err_'+(e&&e.code);u.msg=T[S.lang][key]?t(key):t('err_bad');if(!(e&&e.code))console.warn(e);updU(u);setTimeout(()=>{UP=UP.filter(x=>x!==u);if(S.tab==='add')upList()},9000)}})()}
+catch(e){if(d0&&d0.reading){d0.reading=false;delete d0.rp;saveDoc(d0);if(S.tab==='doc'&&S.doc===d0){detailV();dockU()}}u.err=true;const key='err_'+(e&&e.code);u.msg=T[S.lang][key]?t(key):t('err_bad');if(!(e&&e.code))console.warn(e);updU(u);setTimeout(()=>{UP=UP.filter(x=>x!==u);if(S.tab==='add')upList()},9000)}})()}
 const fallbackSheet=text=>({name:'Text',cols:['Text|النص'],rows:(text||[]).slice(0,3000).map(x=>[x])});
 function mkDoc(f,k,r,cat,ccy){const base=f.name.replace(/\.[^.]+$/,'')||f.name,map={pdf:'pdf',xlsx:'xlsx',csv:'csv',pptx:'pptx',docx:'docx',image:'image',txt:'txt'};
 const noTab=!r.sheets.length,sheets=noTab?[fallbackSheet(r.text)]:r.sheets;
 const d={n:base,cat,src:r.src||map[k.k]||'txt',fmt:k.ext||'',ccy:r.ccy||ccy,date:today(),added:Date.now(),status:r.review&&!noTab?'review':'ready',sheets,si:0,text:(r.text||[]).join('\n'),info:{...r.info,noTab,ccyDet:!!r.ccy},file:{name:f.name,size:f.size,type:f.type}};
-if(r.info&&r.info.trunc)d.info.trunc=true;normDoc(d);d.kr=autoKr(d.rows);syncSheet(d);return d}
+if(r.info&&r.info.trunc)d.info.trunc=true;d.sheets.forEach(x=>{if(x.kr===undefined)x.kr=autoKr(x.rows)});normDoc(d);d.kr=autoKr(d.rows);syncSheet(d);return d}
 async function pushDoc(d,f){d.id=++uid;D.unshift(d);S.fresh=d.id;log(`${t('imported')}: ${nm(d)}`);side();dockU();if(DB){try{if(f)await dbPut('files',{id:d.id,name:f.name,type:f.type,size:f.size,blob:f});await saveDoc(d)}catch(e){stFail(e)}}}
 function addDoc(d,mode){normDoc(d);pushDoc(d);toast(t('imported'));drawer(0);S.tab='doc';S.doc=d;S.mode=mode||'table';S.showAll=false;view();top_()}
 function genInb(x){let h=0;for(const c of x.f)h=(h*31+c.charCodeAt(0))>>>0;const r=()=>{h=(h+0x6D2B79F5)>>>0;let y=h;y=Math.imul(y^y>>>15,y|1);y^=y+Math.imul(y^y>>>7,y|61);return((y^y>>>14)>>>0)/4294967296};let cols,rows;if(x.cat==='fin'){cols=['Item|البند','Amount|المبلغ'];rows=['Materials|المواد','Labour|العمالة','Transport|النقل','Fees|الرسوم'].map(n=>[n,Math.round((3000+r()*40000)/50)*50])}else if(x.cat==='re'){cols=['Unit|الوحدة','Monthly rent|الإيجار الشهري'];rows=[1,2,3,4,5].map(i=>['A-'+(100+i),Math.round((8000+r()*9000)/100)*100])}else{cols=['Month|الشهر','Value|القيمة'];rows=['Jan|يناير','Feb|فبراير','Mar|مارس','Apr|أبريل'].map(n=>[n,Math.round(100+r()*900)])}return{n:x.f.replace(/\.[^.]+$/,''),cat:x.cat,src:x.s,ccy:x.ccy,date:today(),added:Date.now(),cols,rows,status:'review',sim:true}}
@@ -608,11 +622,22 @@ function detailV(){const d=S.doc;useSheet(d);const c=caps(d);if(S.mode==='text'&
 reg('exp',[['xlsx',t('xlsxO')],['pdf',t('pdfO')],['pptx',t('pptxO')],['csv',t('csvO')]],'',doExport);
 const multi=d.sheets.length>1||d.text,chips=d.sheets.length>1?shBar(d):multi?`<div class="chips" style="margin-bottom:12px">${d.sheets.length>1?d.sheets.map((s,i)=>`<button class="${i===d.si&&S.mode!=='text'?'on':''}" onclick="pickSheet(${i})">${esc(s.name||'#'+(i+1))}</button>`).join(''):`<button class="${S.mode!=='text'?'on':''}" onclick="pickSheet(0)">${t('tableT')}</button>`}${d.text?`<button class="${S.mode==='text'?'on':''}" onclick="S.mode='text';detailV();dockU()">${t('viewText')}</button>`:''}</div>`:'';
 $('#view').innerHTML=`<section class="pg"><div class="dh"><div class="dt"><h1>${esc(nm(d))}</h1><div class="row mu sm"><span>${t(d.cat)}</span><span>${esc(fmtL(d))}</span><span>${d.date}</span><span>${d.ccy}</span>${d.sim?`<span class="tag">${t('sim')}</span>`:''}</div></div><div class="row da"><button class="btn g ${S.mode==='edit'?'tg':''}" aria-pressed="${S.mode==='edit'}" aria-label="${t('edit')}" onclick="tgEdit()">${ic('edit')}<span class="hm">${t('edit')}</span></button><button class="btn g" aria-label="${t('present')}" aria-disabled="${!presOK(d)}" onclick="startPresent()">${ic('pres')}<span class="hm">${t('present')}</span></button><button class="btn g ${S.info?'tg':''}" aria-pressed="${!!S.info}" aria-label="${t('info')}" onclick="S.info=!S.info;detailV()">${ic('info')}<span class="hm">${t('info')}</span></button><button class="btn g" aria-label="${t('exportT')}" aria-haspopup="listbox" aria-expanded="false" onclick="openDD('exp',this)">${ic('dl')}<span class="hm">${t('exportT')}</span></button></div></div>
-${S.info?infoV(d):''}${d.status==='review'?`<div class="note"><span style="flex:1 1 200px">${t('rev')}</span><button class="btn" onclick="confirmDoc()">${ic('ok')}${t('confirm')}</button></div>`:c.why?`<p class="mu sm" style="margin:0 0 12px">${c.why}</p>`:''}${chips}<div id="md"></div></section>`;modeV()}
+${d.reading?rdBan(d):''}${S.info?infoV(d):''}${d.status==='review'?`<div class="note"><span style="flex:1 1 200px">${t('rev')}</span><button class="btn" onclick="confirmDoc()">${ic('ok')}${t('confirm')}</button></div>`:c.why?`<p class="mu sm" style="margin:0 0 12px">${c.why}</p>`:''}${chips}<div id="md"></div></section>`;modeV()}
 
 
+Object.assign(T.en,{rdB:'Reading page {a} / {b} · {n} sections so far',rdDone:'Finished reading · {n} sections',stillRd:'Still reading this file. Try again when it finishes.',whySec:'This section has no numbers to chart.',bzCancel:'Cancel',bzCancelled:'Export cancelled',bzCancelling:'Cancelling…'});
+Object.assign(T.ar,{rdB:'جارٍ قراءة الصفحة {a} / {b} · {n} قسم حتى الآن',rdDone:'اكتملت القراءة · {n} قسم',stillRd:'الملف لا يزال قيد القراءة. حاول عند انتهائه.',whySec:'هذا القسم لا يحتوي أرقاماً للرسم.',bzCancel:'إلغاء',bzCancelled:'تم إلغاء التصدير',bzCancelling:'جارٍ الإلغاء…'});
 Object.assign(T.en,{secT:'Sections',secTog:'View together',secDel:'Delete selected',secAll:'Select all',secNone:'Clear',secImpT:'Choose the sections to import',secImpB:'Import selected',secDelQ:'Delete the selected sections for good? This cannot be undone.',secPresT:'Choose sections to present',pick:'Choose sections',err_cancel:'File skipped',secMore:'Showing the first 40 rows'});
 Object.assign(T.ar,{secT:'الأقسام',secTog:'عرض معاً',secDel:'حذف المحدد',secAll:'تحديد الكل',secNone:'إلغاء التحديد',secImpT:'اختر الأقسام المراد استيرادها',secImpB:'استيراد المحدد',secDelQ:'حذف الأقسام المحددة نهائياً؟ لا يمكن التراجع.',secPresT:'اختر الأقسام للعرض',pick:'اختر الأقسام',err_cancel:'تم تخطي الملف',secMore:'يظهر أول 40 صفاً'});
+
+/* ---------- documents that are still being read ---------- */
+const rdTxt=d=>t('rdB').replace('{a}',d.rp?d.rp.a:'…').replace('{b}',d.rp?d.rp.b:'…').replace('{n}',d.sheets.length);
+const rdBan=d=>`<div class="rdb" id="rdb" role="status"><span class="spin"></span><span id="rdt">${esc(rdTxt(d))}</span></div>`;
+function liveU(d,old){side();if(S.tab!=='doc'||S.doc!==d)return;const x=document.getElementById('rdt');if(x)x.textContent=rdTxt(d);const bar=document.querySelector('.shb');
+if(d.sheets.length>1){if(bar)bar.outerHTML=shBar(d);else{detailV();dockU();return}}if(S.mode==='table'&&d.rows&&d.rows.length!==old)modeV()}
+function applyPart(d,pr,pos){const old=d.rows?d.rows.length:0;syncSheet(d);const si=d.si;d.sheets=pr.sheets;d.sheets.forEach(x=>{if(x.kr===undefined)x.kr=autoKr(x.rows)});d.si=Math.min(si,d.sheets.length-1);useSheet(d);d.text=(pr.text||[]).join('\n');d.info={...d.info,...pr.info,noTab:false};if(pos)d.rp=pos;liveU(d,old)}
+async function finishDoc(d,r){const old=d.rows?d.rows.length:0;syncSheet(d);const si=d.si;d.sheets=r.sheets.length?r.sheets:[fallbackSheet(r.text)];d.sheets.forEach(x=>{if(x.kr===undefined)x.kr=autoKr(x.rows)});d.si=Math.min(si,d.sheets.length-1);useSheet(d);d.text=(r.text||[]).join('\n');d.info={...r.info,noTab:!r.sheets.length,ccyDet:!!r.ccy};if(r.ccy)d.ccy=r.ccy;d.status=r.review&&r.sheets.length?'review':'ready';d.reading=false;delete d.rp;await saveDoc(d);
+if(S.tab==='doc'&&S.doc===d){const b=document.getElementById('rdb');if(b)b.remove();if(d.status==='review'||(d.sheets.length>1&&!document.querySelector('.shb'))){detailV();dockU()}else liveU(d,old)}side()}
 /* ---------- sections: pick, delete, present and compare ---------- */
 let XCH=[],PSL=null,DLQ=Promise.resolve();
 const xchD=()=>{XCH.forEach(c=>{try{c.destroy()}catch(e){}});XCH=[]};
@@ -641,7 +666,7 @@ secDlg({title:t('secT'),items:secItems(d.sheets),sel:pre,actions:[{id:'tog',labe
 if(!r||S.doc!==d)return;const sel=r.sel;
 if(r.id==='tog'){S.msec=sel;S.mode='multi';detailV();dockU();top_()}
 else if(r.id==='pres'){const l=sel.filter(i=>hasNum(d.sheets[i]));if(!l.length||d.status==='review'){toast(d.status==='review'?t('whyConf'):t('whyNum'));return}beginPresent(l)}
-else if(r.id==='del')askC(t('secDelQ'),async()=>{d.sheets=d.sheets.filter((_,i)=>!sel.includes(i));d.si=0;useSheet(d);if(S.mode==='multi')S.mode='table';await saveDoc(d);log(`${t('secDel')}: ${nm(d)}`);toast(t('gone'));detailV();side();dockU()},null,t('del'))})}
+else if(r.id==='del'){if(d.reading){toast(t('stillRd'));return}askC(t('secDelQ'),async()=>{d.sheets=d.sheets.filter((_,i)=>!sel.includes(i));d.si=0;useSheet(d);if(S.mode==='multi')S.mode='table';await saveDoc(d);log(`${t('secDel')}: ${nm(d)}`);toast(t('gone'));detailV();side();dockU()},null,t('del'))}})}
 function multiV(el,d){const sis=(S.msec||[]).filter(i=>d.sheets[i]);if(sis.length<2){S.mode='table';modeV();return}const keep=d.si;
 el.innerHTML=`<div class="row" style="margin-bottom:12px"><span class="mu sm" style="flex:1">${t('secTog')} · ${sis.length}</span><button type="button" class="btn g" onclick="secManage()">${ic('sel')}<span>${t('secT')}</span></button></div><div class="cmp">${sis.map(i=>`<div class="card"><h2 style="margin-bottom:10px;overflow-wrap:anywhere">${esc(shLab(d.sheets[i],i))}</h2><div id="mc${i}"></div></div>`).join('')}</div>`;
 sis.forEach(i=>{setSheet(d,i);const h=document.getElementById('mc'+i);if(!h)return;const ok=d.status!=='review'&&numCols(d).length>0;h.innerHTML=tbl({...d,rows:d.rows.slice(0,40)})+(d.rows.length>40?`<p class="mu sm" style="margin-top:8px">${t('secMore')} · 40 / ${d.rows.length}</p>`:'')+(ok?`<div class="cw" style="height:240px;margin-top:12px"><canvas id="mcv${i}"></canvas></div>`:'');
@@ -655,7 +680,7 @@ function stepSheet(dir){const d=S.doc;if(!d)return;const n=d.sheets.length;let i
 const thU=()=>{const h=$('.top');if(h)document.documentElement.style.setProperty('--th',h.offsetHeight+'px')};
 addEventListener('resize',thU);
 function pickSheet(i){if(S.mode==='edit')readEd();setSheet(S.doc,i);if(S.mode==='text'||S.mode==='multi')S.mode='table';S.showAll=false;detailV();dockU()}
-function tgEdit(){if(S.mode==='edit')readEd();S.mode=S.mode==='edit'?'table':'edit';detailV();dockU()}
+function tgEdit(){if(S.doc&&S.doc.reading){toast(t('stillRd'));return}if(S.mode==='edit')readEd();S.mode=S.mode==='edit'?'table':'edit';detailV();dockU()}
 function tbl(d,ed){const nc=numCols(d),cap=!ed&&!S.showAll&&d.rows.length>500,rows=cap?d.rows.slice(0,500):d.rows;return`<div class="tw card" style="padding:6px"><table class="tbl stk" ${ed?'id="ed"':''}><thead><tr>${d.cols.map(c=>`<th>${esc(L(c))}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${d.cols.map((_,i)=>{const v=r[i]??'';return`<td class="${nc.includes(i)?'n':''}" ${ed?'contenteditable="true" inputmode="'+(nc.includes(i)?'decimal':'text')+'"':''}>${esc(!ed&&isN(v)?fmt(v):L(v))}</td>`}).join('')}</tr>`).join('')}</tbody></table>${cap?`<div class="row" style="padding:12px"><span class="mu sm" style="flex:1">500 / ${d.rows.length}</span><button class="btn g" onclick="S.showAll=true;modeV()">${t('showAll')}</button></div>`:''}</div>`}
 function modeV(){xchD();const d=S.doc,m=S.mode,el=$('#md');EDD=m==='edit'?d:null;
 if(m==='table')el.innerHTML=tbl(d);
@@ -668,7 +693,7 @@ function copyText(){const x=S.doc&&S.doc.text||'';(navigator.clipboard?navigator
 function readEd(d=S.doc){if(!d)return;d.rows=[...document.querySelectorAll('#ed tbody tr')].map(tr=>[...tr.children].map((td,ci)=>{const v=td.textContent.trim(),s=v.replace(/,/g,'');return ci>0&&s!==''&&!isNaN(+s)?+s:v}));syncSheet(d)}
 function saveEdit(){readEd();saveDoc(S.doc);log(`${t('saved')}: ${nm(S.doc)}`);toast(t('saved'));detailV()}
 function addRow(){readEd();const d=S.doc;d.rows.push(d.cols.map(()=>''));syncSheet(d);modeV()}
-function confirmDoc(){const d=S.doc;if(S.mode==='edit')readEd();d.status='ready';saveDoc(d);log(`${t('confirmed')}: ${nm(d)}`);toast(t('confirmed'));detailV();side();dockU()}
+function confirmDoc(){const d=S.doc;if(d.reading){toast(t('stillRd'));return}if(S.mode==='edit')readEd();d.status='ready';saveDoc(d);log(`${t('confirmed')}: ${nm(d)}`);toast(t('confirmed'));detailV();side();dockU()}
 function askDel(){const d=S.doc;askC(t('delQ'),async()=>{await delDoc(d.id);afterDel()},null,t('del'))}
 function dlb(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)}
 async function dlOrig(){const rec=await dbGet('files',S.doc.id);if(!rec)return toast(t('err_bad'));dlb(rec.blob,rec.name)}
@@ -698,8 +723,8 @@ function grpModel(){const ds=grpDocs(),ok=ds.filter(d=>caps(d).chart),rows=ok.ma
 const sum={name:t('summary'),cols:[t('fileC'),t('keyfig'),'Value','Currency',`${t('inW')} ${S.base}`],rows:rows.map(x=>[nm(x.d),x.k.label,Math.round(x.k.val*100)/100,x.d.ccy,Math.round(x.v*100)/100])};
 const gc=rows.length?{labels:rows.map(x=>nm(x.d)),sets:[{l:S.base,d:rows.map(x=>Math.round(x.v))}]}:null;sum.chart=gc;
 return{title:t('gTitle').replace('{n}',ds.length),meta:ds.map(nm).join(' · ').slice(0,160),ccy:S.base,sheets:[sum,...ds.map(d=>{useSheet(d);return{name:nm(d),cols:d.cols.map(x=>String(L(x))),rows:d.rows.map(r=>r.map(v=>isN(v)?v:String(L(v)??''))),chart:sheetChart(d)}})],sum:rows.map(x=>`${nm(x.d)}: ${fmt(x.v)} ${S.base}`),chart:null}}
-async function doExport(fmtK){const m=S.tab==='group'?grpModel():docModel(S.doc);if(fmtK==='csv'){exportCsv();return}const fn=(m.title||'sijill').replace(/[\\/:*?"<>|]+/g,'_').slice(0,80);busy(true);
-try{if(fmtK==='xlsx')dlb(await xlsxBlob(m),fn+'.xlsx');else if(fmtK==='pdf')await pdfExport(m,fn);else if(fmtK==='pptx')await pptxExport(m,fn);log(`${t('exp')}: ${m.title} (${fmtK.toUpperCase()})`);toast(t('exp'))}catch(e){console.warn(e);toast(e&&e.code==='offline'?t('err_offline'):t('err_bad'))}finally{busy(false)}}
+async function doExport(fmtK){if(S.tab==='doc'&&S.doc&&S.doc.reading){toast(t('stillRd'));return}const m=S.tab==='group'?grpModel():docModel(S.doc);if(fmtK==='csv'){exportCsv();return}const fn=(m.title||'sijill').replace(/[\\/:*?"<>|]+/g,'_').slice(0,80);if(EXPB){toast(t('exporting'));return}EXPB=true;const bz={cancel:false};busy(true,bz,fmtK==='pdf');
+try{if(fmtK==='xlsx')dlb(await xlsxBlob(m),fn+'.xlsx');else if(fmtK==='pdf')await pdfExport(m,fn,bz);else if(fmtK==='pptx')await pptxExport(m,fn);log(`${t('exp')}: ${m.title} (${fmtK.toUpperCase()})`);toast(t('exp'))}catch(e){if(e&&e.code==='cancel')toast(t('bzCancelled'));else{console.warn(e);toast(e&&e.code==='offline'?t('err_offline'):t('err_bad'))}}finally{EXPB=false;busy(false)}}
 function exportCsv(){const d=S.doc,q=v=>{let x=String(L(v));if(typeof v==='string'&&/^[=+\-@\t\r]/.test(x)&&!/^[-+]?\d[\d.,]*$/.test(x))x="'"+x;return'"'+x.replace(/"/g,'""')+'"'},s=[d.cols.map(q).join(',')].concat(d.rows.map(r=>r.map(q).join(','))).join('\n');dlb(new Blob(['\ufeff'+s],{type:'text/csv'}),nm(d).replace(/[^\w\u0600-\u06FF-]+/g,'_')+'.csv');log(`${t('exp')}: ${nm(d)}`);toast(t('exp'))}
 async function xlsxBlob(m){const Z=await lib('zip'),z=new Z(),rtl=S.lang==='ar',X=s=>String(s).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])),NS='http://schemas.openxmlformats.org/spreadsheetml/2006/main';
 const colL=i=>{let s='';i++;while(i>0){const r=(i-1)%26;s=String.fromCharCode(65+r)+s;i=(i-1-r)/26}return s},names=[],un=n=>{const b=String(n||'Sheet').replace(/[\\\/?*\[\]:]/g,' ').trim().slice(0,31)||'Sheet';let x=b,i=2;while(names.includes(x.toLowerCase()))x=b.slice(0,28)+' '+i++;names.push(x.toLowerCase());return x};
@@ -715,7 +740,8 @@ z.file('xl/_rels/workbook.xml.rels',`<?xml version="1.0" encoding="UTF-8" standa
 z.file('xl/styles.xml',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="${NS}"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FF13201D"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE3EFEC"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FF9FB5AE"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="4"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/><xf numFmtId="3" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="4" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`);
 return z.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',compression:'DEFLATE'})}
 function chartPng(c){if(!window.Chart||!c)return null;const cv=document.createElement('canvas');cv.width=1000;cv.height=400;const col=['#0B7A6B','#8FA79F','#C9D6D2'];let g;try{g=new Chart(cv,{type:'bar',data:{labels:c.labels.map(x=>x.length>26?x.slice(0,25)+'…':x),datasets:c.sets.map((s,i)=>({label:s.l,data:s.d,backgroundColor:col[i%3],borderRadius:4}))},options:{responsive:false,animation:false,devicePixelRatio:1,plugins:{legend:{display:c.sets.length>1}},scales:{x:{ticks:{maxRotation:45,autoSkip:c.labels.length>24,font:{size:c.labels.length>12?9:11}}}}}});const u=cv.toDataURL('image/png');g.destroy();return u}catch(e){return null}}
-async function pdfExport(m,fn){const[h2c,J]=await Promise.all([lib('h2c'),lib('jspdf')]);try{await document.fonts.ready}catch(e){}
+async function pdfExport(m,fn,bz){const[h2c,J]=await Promise.all([lib('h2c'),lib('jspdf')]);try{await document.fonts.ready}catch(e){}
+const tick=()=>new Promise(r=>setTimeout(r,0)),chk=()=>{if(bz&&bz.cancel)throw E('cancel')};let nrow=0,si_=0;const tot_=Math.max(1,m.sheets.length);
 const rtl=S.lang==='ar',W=794,H=1123,PAD=48,host=document.createElement('div');host.style.cssText='position:fixed;left:-12000px;top:0';document.body.appendChild(host);const pages=[];
 const mk_=()=>{const p=document.createElement('div');p.style.cssText=`width:${W}px;height:${H}px;padding:${PAD}px;box-sizing:border-box;background:#fff;color:#13201D;font:13px/1.5 "IBM Plex Sans Arabic",system-ui,sans-serif;position:relative;overflow:hidden;direction:${rtl?'rtl':'ltr'};margin-bottom:20px`;host.appendChild(p);pages.push(p);return p};
 let pg=mk_();const room=()=>pg.getBoundingClientRect().top+H-PAD-28,fits=el=>el.getBoundingClientRect().bottom<=room();
@@ -725,12 +751,19 @@ put(e_('div','display:flex;gap:10px;align-items:center;margin-bottom:6px;color:#
 put(e_('h1','font-size:26px;line-height:1.3;margin:10px 0 4px;font-weight:600',esc(m.title)));put(e_('div','color:#56675F;margin-bottom:18px',esc(m.meta)));
 if(m.sum&&m.sum.length)put(e_('ul','margin:0 0 16px;padding-inline-start:20px;line-height:1.9;font-size:14px',m.sum.map(x=>`<li>${esc(x)}</li>`).join('')));
 const th='padding:7px 9px;text-align:start;background:#E3EFEC;border-bottom:1px solid #9FB5AE;font-weight:600;white-space:nowrap',td='padding:6px 9px;border-bottom:1px solid #E1E7E4;vertical-align:top;font-size:12px';
-for(const s of m.sheets){const head=()=>`<tr>${s.cols.map(c=>`<th style="${th}">${esc(c)}</th>`).join('')}</tr>`;{const hd=e_('h2','font-size:16px;margin:14px 0 8px;font-weight:600',esc(s.name)),im=s.chart?chartPng(s.chart):null;if(im){const w=e_('div','');w.appendChild(hd);const ie=e_('img','width:100%;aspect-ratio:5/2;margin:0 0 10px;display:block');ie.src=im;w.appendChild(ie);put(w)}else put(hd)}
+for(const s of m.sheets){busyP(.35*(si_++)/tot_);await tick();chk();const head=()=>`<tr>${s.cols.map(c=>`<th style="${th}">${esc(c)}</th>`).join('')}</tr>`;{const hd=e_('h2','font-size:16px;margin:14px 0 8px;font-weight:600',esc(s.name)),im=s.chart?chartPng(s.chart):null;if(im){const w=e_('div','');w.appendChild(hd);const ie=e_('img','width:100%;aspect-ratio:5/2;margin:0 0 10px;display:block');ie.src=im;w.appendChild(ie);put(w)}else put(hd)}
 let tb=e_('table','width:100%;border-collapse:collapse;table-layout:auto',`<thead>${head()}</thead><tbody></tbody>`);put(tb);let body=tb.querySelector('tbody');
-for(const r of s.rows.slice(0,600)){const tr=e_('tr','',r.map(v=>`<td style="${td};${isN(v)?'text-align:end;direction:ltr;font-variant-numeric:tabular-nums':''}">${esc(isN(v)?fmt(v):v)}</td>`).join(''));body.appendChild(tr);if(!fits(tb)){body.removeChild(tr);pg=mk_();tb=e_('table','width:100%;border-collapse:collapse',`<thead>${head()}</thead><tbody></tbody>`);pg.appendChild(tb);body=tb.querySelector('tbody');body.appendChild(tr)}}
+for(const r of s.rows.slice(0,600)){if(++nrow%60===0){await tick();chk()}const tr=e_('tr','',r.map(v=>`<td style="${td};${isN(v)?'text-align:end;direction:ltr;font-variant-numeric:tabular-nums':''}">${esc(isN(v)?fmt(v):v)}</td>`).join(''));body.appendChild(tr);if(!fits(tb)){body.removeChild(tr);pg=mk_();tb=e_('table','width:100%;border-collapse:collapse',`<thead>${head()}</thead><tbody></tbody>`);pg.appendChild(tb);body=tb.querySelector('tbody');body.appendChild(tr)}}
 if(pages.length>40)break}
 const out=pages.slice(0,40);out.forEach((p,i)=>p.appendChild(e_('div',`position:absolute;bottom:20px;inset-inline:${PAD}px;display:flex;justify-content:space-between;color:#8A9A94;font-size:11px`,`<span>${esc(m.title.slice(0,60))}</span><span>${i+1} / ${out.length}</span>`)));
-try{const pdf=new J.jsPDF({unit:'mm',format:'a4',orientation:'p'});for(let i=0;i<out.length;i++){const cv=await h2c(out[i],{scale:2,backgroundColor:'#fff',logging:false});if(i)pdf.addPage();pdf.addImage(cv.toDataURL('image/jpeg',.92),'JPEG',0,0,210,297)}pdf.save(fn+'.pdf')}finally{host.remove()}}
+try{const pdf=new J.jsPDF({unit:'mm',format:'a4',orientation:'p'});for(let i=0;i<out.length;i++){chk();busyP(.35+.6*i/out.length);await tick();const cv=await h2c(out[i],{scale:1.5,backgroundColor:'#fff',logging:false});if(i)pdf.addPage();pdf.addImage(cv.toDataURL('image/jpeg',.82),'JPEG',0,0,210,297,undefined,'FAST');cv.width=cv.height=1}
+chk();await embedData(pdf,m);busyP(.99);pdf.save(fn+'.pdf')}finally{host.remove()}}
+/* the exported PDF carries its own data (compressed in the document properties), so importing it back needs no OCR */
+async function embedData(pdf,m){try{const j=JSON.stringify({v:1,t:m.title,c:m.ccy,s:m.sheets.map(x=>({n:x.name,c:x.cols,r:x.rows}))});if(j.length>12e6)return;const Z=await lib('zip'),z=new Z();z.file('d.json',j);const b=await z.generateAsync({type:'base64',compression:'DEFLATE',compressionOptions:{level:6}});if(b.length>6e6)return;pdf.setProperties({title:m.title,subject:'sijill-data:v1',keywords:b,creator:'Sijill'})}catch(e){console.warn(e)}}
+async function sijillData(b64,np){const Z=await lib('zip');let z;try{z=await Z.loadAsync(b64,{base64:true})}catch(e){return null}const f=z.file('d.json');if(!f||(f._data&&f._data.uncompressedSize>16e6))return null;let j;try{j=JSON.parse(await f.async('string'))}catch(e){return null}
+if(!j||!Array.isArray(j.s)||!j.s.length||j.s.length>500)return null;const cell=v=>typeof v==='number'&&isFinite(v)?v:String(v==null?'':v).slice(0,500),sheets=[];
+for(const x of j.s){if(!x||!Array.isArray(x.c)||!Array.isArray(x.r))continue;const cols=x.c.slice(0,60).map(c=>String(c==null?'':c).slice(0,200));if(!cols.length)continue;const rows=x.r.slice(0,3000).filter(Array.isArray).map(r=>cols.map((_,i)=>cell(r[i])));sheets.push({name:String(x.n==null?'':x.n).slice(0,80)||'Table',cols,rows})}
+if(!sheets.length)return null;return{sheets,text:[],info:{pages:np,ocr:0,conf:null,sijill:1},ccy:['SAR','USD','AED','TRY','EGP','EUR'].includes(j.c)?j.c:undefined,review:false}}
 async function pptxExport(m,fn){const G=await lib('pptx'),p=new G(),rtl=S.lang==='ar',AC='0B7A6B',INK='13201D',MU='56675F',F='Calibri',al=rtl?'right':'left',base={fontFace:F,color:INK,rtlMode:rtl};p.layout='LAYOUT_WIDE';p.title=m.title;
 let s=p.addSlide();s.background={color:'F5F7F6'};s.addShape(p.ShapeType.rect,{x:0,y:0,w:.35,h:7.5,fill:{color:AC}});s.addText(m.title,{...base,x:.9,y:2.3,w:11.5,h:1.5,fontSize:36,bold:true,align:al,valign:'bottom'});s.addText(m.meta||'',{...base,x:.9,y:3.95,w:11.5,h:.7,fontSize:16,color:MU,align:al});
 const head=txt=>s.addText(txt,{...base,x:.6,y:.35,w:12.1,h:.7,fontSize:26,bold:true,align:al});
