@@ -34,6 +34,13 @@ It is built as one self-contained `index.html`: no server, no build tooling, no 
 - **Paste text or a chat export** and read it as a document
 - **Manual entry** with an empty editable table
 - **Duplicate detection** using SHA-256, so the same file is not imported twice
+- **Section picker:** when a file contains several tables or sheets, choose which sections to keep before they are imported
+
+### Sections (tables inside a document)
+- **Sticky section switcher** with previous/next arrows, a dropdown and a counter, so you can move between tables without scrolling back to the top
+- **Manage sections:** select any number of sections to **delete**, **present** or **view together**
+- **View together:** compare two or more sections of the same document, each with its own table and chart (side by side on wide screens, stacked on phones)
+- Long sentence fragments picked up from PDFs are no longer used as section names; they become `Table N`
 
 ### Review
 - Documents read from PDFs or images are marked **Needs review** until you confirm them
@@ -42,9 +49,9 @@ It is built as one self-contained `index.html`: no server, no build tooling, no 
 - Per-document **info panel** (pages, OCR pages, confidence, currency detected), **re-read with OCR**, and **download the original file**
 
 ### Analyse
-- **Charts:** bar and line, powered by Chart.js
-- **Auto-generated summary** of the key numbers
-- **Presentation mode** with keyboard navigation (title, chart, summary)
+- **Charts:** bar and line, powered by Chart.js, one per table
+- **Auto-generated summary** of the key numbers; section headings and sparse columns (such as stray page numbers) are ignored
+- **Presentation mode** over one or several sections (title, chart and summary slides for each), with keyboard navigation
 - **Search** across document names and every table row, filtered by category
 - **Compare several documents together** in a combined summary, chart or merged table
 - **Categories:** Financial, Real estate, General
@@ -58,15 +65,15 @@ It is built as one self-contained `index.html`: no server, no build tooling, no 
 | Format | Notes |
 |---|---|
 | **XLSX** | One sheet per table plus an Info sheet, frozen header, RTL-aware |
-| **PDF** | Paginated report with logo, summary, chart and tables |
-| **PPTX** | Title, summary, chart and table slides |
+| **PDF** | Paginated report with logo and summary; each table is followed by its own chart |
+| **PPTX** | Title and summary slides, then a chart slide and table slides for each section |
 | **CSV** | UTF-8 with BOM for Excel, protected against formula injection |
 
 ### Interface
 - Full **Arabic (RTL) and English** UI, switchable at any time
 - **Light and dark** themes
 - Responsive layout with a sidebar on desktop and a drawer plus bottom dock on mobile
-- Respects `prefers-reduced-motion`; keyboard and screen-reader friendly controls
+- Respects `prefers-reduced-motion`; keyboard and screen-reader friendly controls, dialogs close with Esc
 - **Installable as an app** when served over HTTPS (icon is generated at runtime)
 
 ## Privacy and security
@@ -89,6 +96,8 @@ It is built as one self-contained `index.html`: no server, no build tooling, no 
 | PDF pages read | 60 |
 | OCR pages per PDF | 12 |
 | Rows per table | 3,000 |
+| Charts | up to 20 rows per chart |
+| Compare view | first 40 rows of each section |
 | Unpacked Office file | 200 MB |
 
 Legacy Office formats (`.xls`, `.doc`, `.ppt`) and HEIC photos are not supported. Save them as `.xlsx` / `.docx` / `.pptx` or JPG first.
