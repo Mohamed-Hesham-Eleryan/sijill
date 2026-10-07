@@ -254,6 +254,20 @@ input,select,textarea,.in,.sbox input{font-size:16px}
 .dz2{padding:36px 28px;font-size:16px}
 }
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+.shb{position:sticky;top:var(--th,64px);z-index:4;display:flex;align-items:center;gap:6px;margin:0 0 12px;padding:6px 0;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.shb .dd{flex:1;min-width:0}
+.shb .dd>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.shb .ib{flex:none}
+.shc{min-width:40px;text-align:center;white-space:nowrap;flex:none}
+.secl{display:flex;flex-direction:column;gap:6px;max-height:min(46vh,380px);overflow:auto}
+.sec{display:flex;gap:12px;align-items:center;width:100%;min-height:54px;padding:8px 10px;border-radius:12px;border:1px solid var(--ln);background:var(--sf);text-align:start}
+.sec.on{border-color:var(--ac);background:var(--ac2)}
+.sec .fn{min-width:0;display:flex;flex-direction:column;flex:1}
+.sec .fn b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.sec .fn small{color:var(--mu);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.btn[disabled]{opacity:.4;pointer-events:none}
+.cmp{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:16px}
+.cmp .card{min-width:0}
 </style>
 </head>
 <body>
@@ -347,7 +361,7 @@ function splitLine(s){s=s.replace(/[\u200e\u200f]/g,'').trim();if(!s)return[];le
 const m=s.match(/^(.*?\S)\s+((?:[\(\-−–]?[\d٠-٩][\d٠-٩.,٫٬]*\)?%?(?:\s+|$))+)$/);if(m)return[m[1],...m[2].trim().split(/\s+/)];return c.length?c:[s]}
 function fromLines(pages,info){const sheets=[],text=[];let prevS=null;
 pages.forEach((lines,pi)=>{text.push(...lines.map(l=>l.cells.map(c=>c.t).join('   ')));if(pages.length>1)text.push('');buildTables(lines,pi+1).forEach(s=>{if(prevS&&prevS.page===pi&&prevS.cols.length===s.cols.length&&!s.hadHdr){prevS.rows.push(...s.rows);prevS.page=pi+1}else{sheets.push(s);prevS=s}})});
-let k=0;sheets.forEach(s=>{k++;s.name=s.name||(sheets.length>1?`Table ${k}`:'Table');delete s.page;delete s.hadHdr});
+let k=0;const sn_=n=>!n||n.split(/\s+/).length>7||n.length>48||/^[a-z\u2013-]/.test(n)||/%/.test(n);sheets.forEach(s=>{k++;s.name=sn_(s.name)?(sheets.length>1?`Table ${k}`:'Table'):s.name;delete s.page;delete s.hadHdr});
 return{sheets,text:text.filter((x,i,a)=>x||a[i-1]),info:{...info},ccy:detCcy(text.join('\n')),review:true}}
 /* ---------- readers ---------- */
 function tidy(rows,name){rows=rows.map(r=>(r||[]).map(v=>typeof v==='string'?v.trim():v));rows=rows.filter(r=>r.some(v=>v!==''&&v!=null));if(!rows.length)return null;
@@ -452,14 +466,14 @@ function setSheet(d,i){syncSheet(d);d.si=i;useSheet(d)}
 const KR=/^(grand\s+)?total|net\s+(income|profit|loss)|الإجمالي|إجمالي|المجموع|صافي/i;
 function autoKr(rows){for(let i=rows.length-1;i>=0;i--)if(KR.test(String(L(rows[i][0])).trim()))return i;return undefined}
 const isN=v=>typeof v==='number';
-function numColsOf(cols,rows){const o=[];cols.forEach((_,i)=>{if(!i||!rows.length)return;const v=rows.map(r=>r[i]).filter(x=>x!==''&&x!=null),n=v.filter(isN).length;if(n&&n>=v.length*.75)o.push(i)});return o}
+function numColsOf(cols,rows){const o=[];cols.forEach((_,i)=>{if(!i||!rows.length)return;const v=rows.map(r=>r[i]).filter(x=>x!==''&&x!=null),n=v.filter(isN).length;if(n&&n>=v.length*.75&&n>=rows.length*.4)o.push(i)});return o}
 const numCols=d=>numColsOf(d.cols,d.rows);
 function rowVal(d,r){const nc=numCols(d);if(d.kr!=null&&d.agg==='sum')return nc.reduce((s,i)=>s+(+r[i]||0),0);if(d.kr!=null)return +r[nc[0]]||0;return +r[nc[nc.length-1]]||0}
 function keyInfo(d){const nc=numCols(d);if(!nc.length)return null;if(d.kr!=null&&d.rows[d.kr]){const r=d.rows[d.kr],lb=String(L(r[0])||'');if(d.agg==='sum')return{label:lb,val:nc.reduce((s,i)=>s+(+r[i]||0),0)};return{label:lb+' · '+L(d.cols[nc[0]]),val:+r[nc[0]]||0}}const i=nc[nc.length-1];return{label:String(L(d.cols[i])),val:d.rows.reduce((s,r)=>s+(+r[i]||0),0)}}
 function caps(d){const n=numCols(d).length>0,ok=d.status!=='review';return{table:1,edit:1,chart:n&&ok,summary:n&&ok,present:n&&ok,why:!ok?t('whyConf'):!n?t('whyNum'):''}}
-function chartData(d){const nc=numCols(d),RR=d.rows.filter(r=>!isTot(r)),rws=RR.length>=2?RR:d.rows,labels=rws.map(r=>String(L(r[0])||''));if(d.kr!=null&&d.agg==='sum')return{labels,sets:nc.map(i=>({l:String(L(d.cols[i])),d:rws.map(r=>+r[i]||0)}))};if(d.kr!=null)return{labels,sets:nc.slice(0,3).map(i=>({l:String(L(d.cols[i])),d:rws.map(r=>+r[i]||0)}))};const i=nc[nc.length-1];return{labels,sets:[{l:String(L(d.cols[i])),d:rws.map(r=>+r[i]||0)}]}}
+function chartData(d){const nc=numCols(d),RR=d.rows.filter(r=>!isTot(r)&&nc.some(i=>isN(r[i]))),rws=RR.length>=2?RR:d.rows,labels=rws.map(r=>String(L(r[0])||''));if(d.kr!=null&&d.agg==='sum')return{labels,sets:nc.map(i=>({l:String(L(d.cols[i])),d:rws.map(r=>+r[i]||0)}))};if(d.kr!=null)return{labels,sets:nc.slice(0,3).map(i=>({l:String(L(d.cols[i])),d:rws.map(r=>+r[i]||0)}))};const i=nc[nc.length-1];return{labels,sets:[{l:String(L(d.cols[i])),d:rws.map(r=>+r[i]||0)}]}}
 const TOT=/^(grand\s+)?total|الإجمالي|إجمالي|المجموع/i,isTot=r=>TOT.test(String(L(r[0])).trim());
-function sumLines(d){const k=keyInfo(d),nc=numCols(d),li=nc[nc.length-1];const rv=d.rows.filter(r=>!isTot(r)).map(r=>({l:String(L(r[0])||''),v:rowVal(d,r)})).sort((a,b)=>b.v-a.v);const o=[`${k.label}: ${fmt(k.val)} ${d.ccy} (≈ ${fmt(conv(k.val,d.ccy))} ${S.base})`];if(rv.length>1){o.push(`${t('high')}: ${rv[0].l} (${fmt(rv[0].v)})`);o.push(`${t('low')}: ${rv[rv.length-1].l} (${fmt(rv[rv.length-1].v)})`)}
+function sumLines(d){const k=keyInfo(d),nc=numCols(d),li=nc[nc.length-1];const rv=d.rows.filter(r=>!isTot(r)&&nc.some(i=>isN(r[i]))).map(r=>({l:String(L(r[0])||''),v:rowVal(d,r)})).sort((a,b)=>b.v-a.v);const o=[`${k.label}: ${fmt(k.val)} ${d.ccy} (≈ ${fmt(conv(k.val,d.ccy))} ${S.base})`];if(rv.length>1){o.push(`${t('high')}: ${rv[0].l} (${fmt(rv[0].v)})`);o.push(`${t('low')}: ${rv[rv.length-1].l} (${fmt(rv[rv.length-1].v)})`)}
 if(d.kr==null||d.agg==='sum'){const a=d.kr!=null?nc.map(i=>+d.rows[d.kr][i]||0):d.rows.map(r=>+r[li]||0);if(a.length>1&&a[0]){const p=(a[a.length-1]/a[0]-1)*100;o.push(`${t('trend')}: ${fmt(a[0])} → ${fmt(a[a.length-1])} (${p>=0?'+':''}${p.toFixed(1)}%)`)}}return o}
 const srcL=s=>t(s)||s;
 const fmtL=d=>d.fmt?d.fmt.toUpperCase():srcL(d.src);
@@ -508,12 +522,12 @@ async function delDoc(id){D=D.filter(d=>d.id!==id);S.grp=S.grp.filter(x=>x!==id)
 function afterDel(){if(S.tab==='doc'&&!S.doc)S.tab=D.length?'home':'add';if(S.tab==='group'&&S.grp.length<2)S.tab=D.length?'home':'add';view();stU();toast(t('gone'))}
 function clearAll(){askC(t('clrQ'),async()=>{try{await dbClr('docs');await dbClr('files');await dbClr('kv')}catch(e){stFail(e)}D=[];INB=[];logs=[];S.doc=null;S.grp=[];S.sel=null;S.tab='add';log('Workspace ready');view();stU()},null,t('clearW'))}
 function dockU(){const dk=$('#dock');if(!dk)return;dk.classList.toggle('hid',!D.length);const d=S.doc||D[0],c=d?caps(d):{chart:0,summary:0},m=S.tab==='doc'?S.mode:'',g=S.tab==='group';
-const on={home:S.tab==='home',table:(S.tab==='doc'&&(m==='table'||m==='edit'||m==='text'))||(g&&S.gm==='table'),chart:(S.tab==='doc'&&m==='chart')||(g&&S.gm==='chart'),summary:(S.tab==='doc'&&m==='summary')||(g&&S.gm==='summary'),search:S.tab==='search'};
+const on={home:S.tab==='home',table:(S.tab==='doc'&&(m==='table'||m==='edit'||m==='text'||m==='multi'))||(g&&S.gm==='table'),chart:(S.tab==='doc'&&m==='chart')||(g&&S.gm==='chart'),summary:(S.tab==='doc'&&m==='summary')||(g&&S.gm==='summary'),search:S.tab==='search'};
 dk.querySelectorAll('.dk').forEach(b=>{const k=b.dataset.k;b.classList.toggle('on',!!on[k]);b.setAttribute('aria-selected',!!on[k]);b.classList.toggle('off',!g&&((k==='chart'&&!c.chart)||(k==='summary'&&!c.summary)))});
 const f=$('#fab');if(f)f.classList.toggle('on',S.tab==='add')}
-function view(){if(EDD&&document.querySelector('#ed')){readEd(EDD);saveDoc(EDD)}EDD=null;if(ch){ch.destroy();ch=null}
+function view(){if(EDD&&document.querySelector('#ed')){readEd(EDD);saveDoc(EDD)}EDD=null;xchD();if(ch){ch.destroy();ch=null}
 if(!D.length)S.tab='add';if(S.tab==='doc'&&!S.doc)S.tab='home';
-({home:homeV,doc:detailV,search:searchV,add:addV,group:groupV})[S.tab]();chipU();side();dockU();if(S.fresh)setTimeout(()=>{S.fresh=null},900)}
+({home:homeV,doc:detailV,search:searchV,add:addV,group:groupV})[S.tab]();chipU();side();dockU();thU();if(S.fresh)setTimeout(()=>{S.fresh=null},900)}
 const top_=()=>{try{scrollTo(0,0)}catch(e){}};
 const go=k=>{drawer(0);S.tab=k;view();top_()};
 function dockGo(k){drawer(0);if(k==='home'||k==='search'){S.tab=k;view();top_();return}
@@ -562,6 +576,7 @@ const hash=(await sha(buf))||`${f.size}:${f.name}`,dup=D.find(d=>d.hash===hash);
 const k=await sniff(buf,f);u.ik=k.k;if(k.k==='heic')throw E('heic');setU(u,'rd',.12);let r;
 if(k.k==='pdf')r=await readPdf(buf,u);else if(k.k==='image')r=await readImage(f,u);else if(k.k==='xlsx')r=await readXlsx(k.z);else if(k.k==='docx')r=await readDocx(k.z);else if(k.k==='pptx')r=await readPptx(k.z);else if(k.k==='csv')r=readCsv(buf);else r=readText(decodeText(buf));
 setU(u,'ext',.97);if(!r.sheets.length&&!(r.text&&r.text.length))throw E('noData');
+if(r.sheets.length>1){setU(u,'pick',.97);const pk=await pickImport(f.name,r.sheets);if(!pk)throw E('cancel');r.sheets=pk}
 const d=mkDoc(f,k,r,cat,ccy);d.hash=hash;await pushDoc(d,f);u.doc=d;u.done=true;u.p=1;updU(u);toast(t('imported'));
 if(solo)setTimeout(()=>{if(S.tab==='add')openDoc(d.id)},RM?0:900)}
 catch(e){u.err=true;const key='err_'+(e&&e.code);u.msg=T[S.lang][key]?t(key):t('err_bad');if(!(e&&e.code))console.warn(e);updU(u);setTimeout(()=>{UP=UP.filter(x=>x!==u);if(S.tab==='add')upList()},9000)}})()}
@@ -589,19 +604,65 @@ return`<div class="card infoc"><div class="row" style="flex-wrap:nowrap">${ic(SI
 ${lines.length?`<ul class="lst sm">${lines.map(x=>`<li><span class="dot"></span><span>${esc(x)}</span></li>`).join('')}</ul>`:''}
 <div class="kv"><div class="fld"><span class="mu sm">${t('kind')}</span>${dd('dcat',kinds_(),d.cat,v=>{d.cat=v;saveDoc(d);detailV();side()})}</div><div class="fld"><span class="mu sm">${t('cur')}</span>${dd('dccy',ccys.map(c=>[c,c]),d.ccy,v=>{d.ccy=v;saveDoc(d);detailV()})}</div><div class="fld"><span class="mu sm">${t('keyfig')}</span>${dd('dkr',kr,d.kr==null?'':String(d.kr),v=>{d.kr=v===''?undefined:+v;saveDoc(d);detailV()})}</div></div>
 <div class="row">${canRe?`<button class="btn g" onclick="reread()">${ic('scan')}${t('ocrAgain')}</button>`:''}<button class="btn g danger" onclick="askDel()">${ic('trash')}${t('del')}</button></div></div>`}
-function detailV(){const d=S.doc;useSheet(d);const c=caps(d);if(S.mode==='text'&&!d.text)S.mode='table';if(!['edit','text','table'].includes(S.mode)&&!c[S.mode])S.mode='table';
+function detailV(){const d=S.doc;useSheet(d);const c=caps(d);if(S.mode==='text'&&!d.text)S.mode='table';if(!['edit','text','table','multi'].includes(S.mode)&&!c[S.mode])S.mode='table';
 reg('exp',[['xlsx',t('xlsxO')],['pdf',t('pdfO')],['pptx',t('pptxO')],['csv',t('csvO')]],'',doExport);
-const multi=d.sheets.length>1||d.text,chips=multi?`<div class="chips" style="margin-bottom:12px">${d.sheets.length>1?d.sheets.map((s,i)=>`<button class="${i===d.si&&S.mode!=='text'?'on':''}" onclick="pickSheet(${i})">${esc(s.name||'#'+(i+1))}</button>`).join(''):`<button class="${S.mode!=='text'?'on':''}" onclick="pickSheet(0)">${t('tableT')}</button>`}${d.text?`<button class="${S.mode==='text'?'on':''}" onclick="S.mode='text';detailV();dockU()">${t('viewText')}</button>`:''}</div>`:'';
-$('#view').innerHTML=`<section class="pg"><div class="dh"><div class="dt"><h1>${esc(nm(d))}</h1><div class="row mu sm"><span>${t(d.cat)}</span><span>${esc(fmtL(d))}</span><span>${d.date}</span><span>${d.ccy}</span>${d.sim?`<span class="tag">${t('sim')}</span>`:''}</div></div><div class="row da"><button class="btn g ${S.mode==='edit'?'tg':''}" aria-pressed="${S.mode==='edit'}" aria-label="${t('edit')}" onclick="tgEdit()">${ic('edit')}<span class="hm">${t('edit')}</span></button><button class="btn g" aria-label="${t('present')}" aria-disabled="${!c.present}" onclick="startPresent()">${ic('pres')}<span class="hm">${t('present')}</span></button><button class="btn g ${S.info?'tg':''}" aria-pressed="${!!S.info}" aria-label="${t('info')}" onclick="S.info=!S.info;detailV()">${ic('info')}<span class="hm">${t('info')}</span></button><button class="btn g" aria-label="${t('exportT')}" aria-haspopup="listbox" aria-expanded="false" onclick="openDD('exp',this)">${ic('dl')}<span class="hm">${t('exportT')}</span></button></div></div>
+const multi=d.sheets.length>1||d.text,chips=d.sheets.length>1?shBar(d):multi?`<div class="chips" style="margin-bottom:12px">${d.sheets.length>1?d.sheets.map((s,i)=>`<button class="${i===d.si&&S.mode!=='text'?'on':''}" onclick="pickSheet(${i})">${esc(s.name||'#'+(i+1))}</button>`).join(''):`<button class="${S.mode!=='text'?'on':''}" onclick="pickSheet(0)">${t('tableT')}</button>`}${d.text?`<button class="${S.mode==='text'?'on':''}" onclick="S.mode='text';detailV();dockU()">${t('viewText')}</button>`:''}</div>`:'';
+$('#view').innerHTML=`<section class="pg"><div class="dh"><div class="dt"><h1>${esc(nm(d))}</h1><div class="row mu sm"><span>${t(d.cat)}</span><span>${esc(fmtL(d))}</span><span>${d.date}</span><span>${d.ccy}</span>${d.sim?`<span class="tag">${t('sim')}</span>`:''}</div></div><div class="row da"><button class="btn g ${S.mode==='edit'?'tg':''}" aria-pressed="${S.mode==='edit'}" aria-label="${t('edit')}" onclick="tgEdit()">${ic('edit')}<span class="hm">${t('edit')}</span></button><button class="btn g" aria-label="${t('present')}" aria-disabled="${!presOK(d)}" onclick="startPresent()">${ic('pres')}<span class="hm">${t('present')}</span></button><button class="btn g ${S.info?'tg':''}" aria-pressed="${!!S.info}" aria-label="${t('info')}" onclick="S.info=!S.info;detailV()">${ic('info')}<span class="hm">${t('info')}</span></button><button class="btn g" aria-label="${t('exportT')}" aria-haspopup="listbox" aria-expanded="false" onclick="openDD('exp',this)">${ic('dl')}<span class="hm">${t('exportT')}</span></button></div></div>
 ${S.info?infoV(d):''}${d.status==='review'?`<div class="note"><span style="flex:1 1 200px">${t('rev')}</span><button class="btn" onclick="confirmDoc()">${ic('ok')}${t('confirm')}</button></div>`:c.why?`<p class="mu sm" style="margin:0 0 12px">${c.why}</p>`:''}${chips}<div id="md"></div></section>`;modeV()}
-function pickSheet(i){if(S.mode==='edit')readEd();setSheet(S.doc,i);if(S.mode==='text')S.mode='table';S.showAll=false;detailV();dockU()}
+
+
+Object.assign(T.en,{secT:'Sections',secTog:'View together',secDel:'Delete selected',secAll:'Select all',secNone:'Clear',secImpT:'Choose the sections to import',secImpB:'Import selected',secDelQ:'Delete the selected sections for good? This cannot be undone.',secPresT:'Choose sections to present',pick:'Choose sections',err_cancel:'File skipped',secMore:'Showing the first 40 rows'});
+Object.assign(T.ar,{secT:'الأقسام',secTog:'عرض معاً',secDel:'حذف المحدد',secAll:'تحديد الكل',secNone:'إلغاء التحديد',secImpT:'اختر الأقسام المراد استيرادها',secImpB:'استيراد المحدد',secDelQ:'حذف الأقسام المحددة نهائياً؟ لا يمكن التراجع.',secPresT:'اختر الأقسام للعرض',pick:'اختر الأقسام',err_cancel:'تم تخطي الملف',secMore:'يظهر أول 40 صفاً'});
+/* ---------- sections: pick, delete, present and compare ---------- */
+let XCH=[],PSL=null,DLQ=Promise.resolve();
+const xchD=()=>{XCH.forEach(c=>{try{c.destroy()}catch(e){}});XCH=[]};
+const hasNum=s=>numColsOf(s.cols,s.rows).length>0;
+const presOK=d=>d.status!=='review'&&d.sheets.some(hasNum);
+const secSub=s=>{let f='';try{f=String(L(s.rows[0]&&s.rows[0][0]!=null?s.rows[0][0]:'')).slice(0,28)}catch(e){}return`${s.rows.length} × ${s.cols.length}`+(f?' · '+f:'')};
+const secItems=(sh,only)=>sh.map((s,i)=>({i,name:shLab(s,i),sub:secSub(s)})).filter(x=>!only||only(sh[x.i]));
+const dlgQ=fn=>{const p=DLQ.then(fn);DLQ=p.then(()=>{},()=>{});return p};
+function secDlg(o){return new Promise(res=>{
+const ov=document.createElement('div');ov.className='md';ov.style.zIndex=80;ov.setAttribute('role','dialog');ov.setAttribute('aria-modal','true');
+const sel=new Set(o.sel||[]),ids=o.items.map(x=>x.i),kd=e=>{if(e.key==='Escape'){e.stopPropagation();e.preventDefault();done(null)}},done=v=>{document.removeEventListener('keydown',kd,true);ov.remove();res(v)};document.addEventListener('keydown',kd,true);
+const draw=fs=>{const old=ov.querySelector('.secl'),st=old?old.scrollTop:0;
+ov.innerHTML=`<div class="mdc"><div class="row" style="flex-wrap:nowrap"><h2 style="flex:1;margin:0">${esc(o.title)}</h2><button type="button" class="ib" data-a="x" aria-label="${t('cls')}">${ic('x')}</button></div>${o.note?`<p class="mu sm" style="margin-top:4px;overflow-wrap:anywhere">${esc(o.note)}</p>`:''}
+<div class="row" style="margin:12px 0 8px"><button type="button" class="btn g" data-a="all">${t('secAll')}</button><button type="button" class="btn g" data-a="none">${t('secNone')}</button><span class="mu sm" style="margin-inline-start:auto">${sel.size} / ${ids.length}</span></div>
+<div class="secl">${o.items.map(x=>{const on=sel.has(x.i);return`<button type="button" class="sec${on?' on':''}" data-i="${x.i}" role="checkbox" aria-checked="${on}"><span class="cb ${on?'on':''}">${on?ic('ok'):''}</span><span class="fn"><b>${esc(x.name)}</b><small>${esc(x.sub||'')}</small></span></button>`}).join('')}</div>
+<div class="row" style="margin-top:14px;justify-content:flex-end">${o.actions.map(a=>{const n=sel.size,dis=n<(a.min==null?1:a.min)||(a.max!=null&&n>a.max);return`<button type="button" class="btn ${a.cls||''}" data-a="${a.id}" ${dis?'disabled':''}>${a.icon?ic(a.icon):''}<span>${esc(a.label)}</span></button>`}).join('')}</div></div>`;
+const nl=ov.querySelector('.secl');if(nl)nl.scrollTop=st;if(fs!=null){const f=ov.querySelector('[data-i="'+fs+'"]');if(f)f.focus()}};
+ov.onclick=e=>{if(e.target===ov){done(null);return}const b=e.target.closest('button');if(!b||b.disabled)return;const a=b.dataset.a,i=b.dataset.i;
+if(i!=null){const n=+i;sel.has(n)?sel.delete(n):sel.add(n);draw(n);return}
+if(a==='x')done(null);else if(a==='all'){ids.forEach(x=>sel.add(x));draw()}else if(a==='none'){sel.clear();draw()}else done({id:a,sel:[...sel].sort((x,y)=>x-y)})};
+document.body.appendChild(ov);draw();const f=ov.querySelector('.sec');if(f)f.focus()})}
+async function pickImport(name,sheets){const r=await dlgQ(()=>secDlg({title:t('secImpT'),note:name,items:secItems(sheets),sel:sheets.map((_,i)=>i),actions:[{id:'ok',label:t('secImpB'),min:1}]}));return r&&r.id==='ok'?r.sel.map(i=>sheets[i]):null}
+function secManage(){const d=S.doc;if(!d||d.sheets.length<2)return;if(S.mode==='edit')readEd();syncSheet(d);
+const pre=S.mode==='multi'&&S.msec?S.msec.filter(i=>d.sheets[i]):[d.si];
+secDlg({title:t('secT'),items:secItems(d.sheets),sel:pre,actions:[{id:'tog',label:t('secTog'),icon:'layers',cls:'g',min:2},{id:'pres',label:t('present'),icon:'pres',cls:'g',min:1},{id:'del',label:t('secDel'),icon:'trash',cls:'g danger',min:1,max:d.sheets.length-1}]}).then(r=>{
+if(!r||S.doc!==d)return;const sel=r.sel;
+if(r.id==='tog'){S.msec=sel;S.mode='multi';detailV();dockU();top_()}
+else if(r.id==='pres'){const l=sel.filter(i=>hasNum(d.sheets[i]));if(!l.length||d.status==='review'){toast(d.status==='review'?t('whyConf'):t('whyNum'));return}beginPresent(l)}
+else if(r.id==='del')askC(t('secDelQ'),async()=>{d.sheets=d.sheets.filter((_,i)=>!sel.includes(i));d.si=0;useSheet(d);if(S.mode==='multi')S.mode='table';await saveDoc(d);log(`${t('secDel')}: ${nm(d)}`);toast(t('gone'));detailV();side();dockU()},null,t('del'))})}
+function multiV(el,d){const sis=(S.msec||[]).filter(i=>d.sheets[i]);if(sis.length<2){S.mode='table';modeV();return}const keep=d.si;
+el.innerHTML=`<div class="row" style="margin-bottom:12px"><span class="mu sm" style="flex:1">${t('secTog')} · ${sis.length}</span><button type="button" class="btn g" onclick="secManage()">${ic('sel')}<span>${t('secT')}</span></button></div><div class="cmp">${sis.map(i=>`<div class="card"><h2 style="margin-bottom:10px;overflow-wrap:anywhere">${esc(shLab(d.sheets[i],i))}</h2><div id="mc${i}"></div></div>`).join('')}</div>`;
+sis.forEach(i=>{setSheet(d,i);const h=document.getElementById('mc'+i);if(!h)return;const ok=d.status!=='review'&&numCols(d).length>0;h.innerHTML=tbl({...d,rows:d.rows.slice(0,40)})+(d.rows.length>40?`<p class="mu sm" style="margin-top:8px">${t('secMore')} · 40 / ${d.rows.length}</p>`:'')+(ok?`<div class="cw" style="height:240px;margin-top:12px"><canvas id="mcv${i}"></canvas></div>`:'');
+if(ok){const c=chartData(d);mk(document.getElementById('mcv'+i),c.labels.slice(0,20),c.sets.map(x=>({l:x.l,d:x.d.slice(0,20)})),S.ct,false);if(ch){XCH.push(ch);ch=null}}});
+setSheet(d,keep)}
+const shLab=(s,i)=>{const n=String(s.name||'#'+(i+1)),c=n.length>44?n.slice(0,43)+'…':n;return/^Table \d+$/.test(n)||/^#\d+$/.test(n)?c:(i+1)+' · '+c};
+function shBar(d){const n=d.sheets.length,txt=S.mode==='text',cur=txt?'text':String(d.si),rtl=S.lang==='ar',o=d.sheets.map((s,i)=>[String(i),shLab(s,i)]);if(d.text)o.push(['text',t('viewText')]);
+const ar=dir=>`<button type="button" class="ib" onclick="stepSheet(${dir})" aria-label="${dir<0?'prev':'next'}">${ic(dir<0?(rtl?'chr':'chl'):(rtl?'chl':'chr'))}</button>`;
+return`<div class="shb">${ar(-1)}${dd('sheet',o,cur,v=>{if(v==='text'){if(S.mode==='edit')readEd();S.mode='text';detailV();dockU()}else pickSheet(+v)})}<span class="mu sm shc">${txt?'':(d.si+1)+'/'+n}</span>${ar(1)}<button type="button" class="ib" onclick="secManage()" aria-label="${t('secT')}" title="${t('secT')}">${ic('sel')}</button></div>`}
+function stepSheet(dir){const d=S.doc;if(!d)return;const n=d.sheets.length;let i=S.mode==='text'?(dir>0?-1:n):d.si;pickSheet(Math.min(n-1,Math.max(0,i+dir)))}
+const thU=()=>{const h=$('.top');if(h)document.documentElement.style.setProperty('--th',h.offsetHeight+'px')};
+addEventListener('resize',thU);
+function pickSheet(i){if(S.mode==='edit')readEd();setSheet(S.doc,i);if(S.mode==='text'||S.mode==='multi')S.mode='table';S.showAll=false;detailV();dockU()}
 function tgEdit(){if(S.mode==='edit')readEd();S.mode=S.mode==='edit'?'table':'edit';detailV();dockU()}
 function tbl(d,ed){const nc=numCols(d),cap=!ed&&!S.showAll&&d.rows.length>500,rows=cap?d.rows.slice(0,500):d.rows;return`<div class="tw card" style="padding:6px"><table class="tbl stk" ${ed?'id="ed"':''}><thead><tr>${d.cols.map(c=>`<th>${esc(L(c))}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${d.cols.map((_,i)=>{const v=r[i]??'';return`<td class="${nc.includes(i)?'n':''}" ${ed?'contenteditable="true" inputmode="'+(nc.includes(i)?'decimal':'text')+'"':''}>${esc(!ed&&isN(v)?fmt(v):L(v))}</td>`}).join('')}</tr>`).join('')}</tbody></table>${cap?`<div class="row" style="padding:12px"><span class="mu sm" style="flex:1">500 / ${d.rows.length}</span><button class="btn g" onclick="S.showAll=true;modeV()">${t('showAll')}</button></div>`:''}</div>`}
-function modeV(){const d=S.doc,m=S.mode,el=$('#md');EDD=m==='edit'?d:null;
+function modeV(){xchD();const d=S.doc,m=S.mode,el=$('#md');EDD=m==='edit'?d:null;
 if(m==='table')el.innerHTML=tbl(d);
 else if(m==='edit')el.innerHTML=tbl(d,1)+`<div class="row" style="margin-top:14px"><button class="btn" onclick="saveEdit()">${ic('ok')}${t('save')}</button><button class="btn g" onclick="addRow()">${ic('plus')}${t('addRow')}</button></div>`;
 else if(m==='text')el.innerHTML=`<div class="card"><div class="row" style="margin-bottom:10px"><button class="btn g" onclick="copyText()">${ic('copy')}${t('copy')}</button></div><pre class="txt">${esc(d.text||'')}</pre></div>`;
 else if(m==='chart'){el.innerHTML=`<div class="chips" style="margin-bottom:12px">${[['bar','bar'],['line','line']].map(([k,l])=>`<button class="${S.ct===k?'on':''}" onclick="S.ct='${k}';save();modeV()">${t(l)}</button>`).join('')}</div><div class="card"><div class="cw"><canvas id="cv" role="img" aria-label="${esc(nm(d))}"></canvas></div></div>`;const c=chartData(d);mk($('#cv'),c.labels,c.sets,S.ct,false)}
+else if(m==='multi')multiV(el,d);
 else if(m==='summary')el.innerHTML=`<div class="card"><ul class="lst">${sumLines(d).map(x=>`<li><span class="dot" style="transform:translateY(-1px)"></span><span>${esc(x)}</span></li>`).join('')}</ul></div>`}
 function copyText(){const x=S.doc&&S.doc.text||'';(navigator.clipboard?navigator.clipboard.writeText(x):Promise.reject()).then(()=>toast(t('copied'))).catch(()=>{const a=document.createElement('textarea');a.value=x;document.body.appendChild(a);a.select();try{document.execCommand('copy');toast(t('copied'))}catch(e){}a.remove()})}
 function readEd(d=S.doc){if(!d)return;d.rows=[...document.querySelectorAll('#ed tbody tr')].map(tr=>[...tr.children].map((td,ci)=>{const v=td.textContent.trim(),s=v.replace(/,/g,'');return ci>0&&s!==''&&!isNaN(+s)?+s:v}));syncSheet(d)}
@@ -631,10 +692,12 @@ ${bad.length&&S.gm!=='table'?`<div class="note"><span style="flex:1 1 200px">${t
 if(S.gm==='chart'&&rows.length)mk($('#cv'),rows.map(x=>nm(x.d)),[{l:S.base,d:rows.map(x=>Math.round(x.v))}],'bar',true)}
 function grpRm(id){S.grp=S.grp.filter(x=>x!==id);view()}
 /* ---------- export: Excel, PDF, PowerPoint, CSV ---------- */
-function docModel(d){useSheet(d);const c=caps(d);return{title:nm(d),meta:[t(d.cat),fmtL(d),d.ccy,d.date].join(' · '),ccy:d.ccy,file:d.file&&d.file.name,sheets:d.sheets.map(s=>({name:s.name||nm(d),cols:s.cols.map(x=>String(L(x))),rows:s.rows.map(r=>r.map(v=>isN(v)?v:String(L(v)??'')))})),sum:c.summary?sumLines(d):null,chart:c.chart?chartData(d):null}}
+function sheetChart(d){if(d.status==='review'||!numCols(d).length)return null;const c=chartData(d);if(!c||c.labels.length<2||!c.sets.length)return null;return{labels:c.labels.slice(0,20),sets:c.sets.map(x=>({l:x.l,d:x.d.slice(0,20)}))}}
+function docModel(d){const si=d.si;useSheet(d);const sheets=d.sheets.map((s,i)=>{setSheet(d,i);return{name:s.name||nm(d),cols:d.cols.map(x=>String(L(x))),rows:d.rows.map(r=>r.map(v=>isN(v)?v:String(L(v)??''))),chart:sheetChart(d)}});setSheet(d,si);const c=caps(d);return{title:nm(d),meta:[t(d.cat),fmtL(d),d.ccy,d.date].join(' · '),ccy:d.ccy,file:d.file&&d.file.name,sheets,sum:c.summary?sumLines(d):null,chart:null}}
 function grpModel(){const ds=grpDocs(),ok=ds.filter(d=>caps(d).chart),rows=ok.map(d=>{useSheet(d);const k=keyInfo(d);return{d,k,v:conv(k.val,d.ccy)}});
 const sum={name:t('summary'),cols:[t('fileC'),t('keyfig'),'Value','Currency',`${t('inW')} ${S.base}`],rows:rows.map(x=>[nm(x.d),x.k.label,Math.round(x.k.val*100)/100,x.d.ccy,Math.round(x.v*100)/100])};
-return{title:t('gTitle').replace('{n}',ds.length),meta:ds.map(nm).join(' · ').slice(0,160),ccy:S.base,sheets:[sum,...ds.map(d=>{useSheet(d);return{name:nm(d),cols:d.cols.map(x=>String(L(x))),rows:d.rows.map(r=>r.map(v=>isN(v)?v:String(L(v)??'')))}})],sum:rows.map(x=>`${nm(x.d)}: ${fmt(x.v)} ${S.base}`),chart:rows.length?{labels:rows.map(x=>nm(x.d)),sets:[{l:S.base,d:rows.map(x=>Math.round(x.v))}]}:null}}
+const gc=rows.length?{labels:rows.map(x=>nm(x.d)),sets:[{l:S.base,d:rows.map(x=>Math.round(x.v))}]}:null;sum.chart=gc;
+return{title:t('gTitle').replace('{n}',ds.length),meta:ds.map(nm).join(' · ').slice(0,160),ccy:S.base,sheets:[sum,...ds.map(d=>{useSheet(d);return{name:nm(d),cols:d.cols.map(x=>String(L(x))),rows:d.rows.map(r=>r.map(v=>isN(v)?v:String(L(v)??''))),chart:sheetChart(d)}})],sum:rows.map(x=>`${nm(x.d)}: ${fmt(x.v)} ${S.base}`),chart:null}}
 async function doExport(fmtK){const m=S.tab==='group'?grpModel():docModel(S.doc);if(fmtK==='csv'){exportCsv();return}const fn=(m.title||'sijill').replace(/[\\/:*?"<>|]+/g,'_').slice(0,80);busy(true);
 try{if(fmtK==='xlsx')dlb(await xlsxBlob(m),fn+'.xlsx');else if(fmtK==='pdf')await pdfExport(m,fn);else if(fmtK==='pptx')await pptxExport(m,fn);log(`${t('exp')}: ${m.title} (${fmtK.toUpperCase()})`);toast(t('exp'))}catch(e){console.warn(e);toast(e&&e.code==='offline'?t('err_offline'):t('err_bad'))}finally{busy(false)}}
 function exportCsv(){const d=S.doc,q=v=>{let x=String(L(v));if(typeof v==='string'&&/^[=+\-@\t\r]/.test(x)&&!/^[-+]?\d[\d.,]*$/.test(x))x="'"+x;return'"'+x.replace(/"/g,'""')+'"'},s=[d.cols.map(q).join(',')].concat(d.rows.map(r=>r.map(q).join(','))).join('\n');dlb(new Blob(['\ufeff'+s],{type:'text/csv'}),nm(d).replace(/[^\w\u0600-\u06FF-]+/g,'_')+'.csv');log(`${t('exp')}: ${nm(d)}`);toast(t('exp'))}
@@ -651,7 +714,7 @@ z.file('xl/workbook.xml',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?
 z.file('xl/_rels/workbook.xml.rels',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${sh.map((_,i)=>`<Relationship Id="rId${i+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i+1}.xml"/>`).join('')}<Relationship Id="rId${n+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`);
 z.file('xl/styles.xml',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="${NS}"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FF13201D"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE3EFEC"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FF9FB5AE"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="4"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/><xf numFmtId="3" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="4" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`);
 return z.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',compression:'DEFLATE'})}
-function chartPng(c){if(!window.Chart||!c)return null;const cv=document.createElement('canvas');cv.width=1000;cv.height=400;const col=['#0B7A6B','#8FA79F','#C9D6D2'];let g;try{g=new Chart(cv,{type:'bar',data:{labels:c.labels,datasets:c.sets.map((s,i)=>({label:s.l,data:s.d,backgroundColor:col[i%3],borderRadius:4}))},options:{responsive:false,animation:false,devicePixelRatio:1,plugins:{legend:{display:c.sets.length>1}},scales:{x:{ticks:{maxRotation:30,autoSkip:true}}}}});const u=cv.toDataURL('image/png');g.destroy();return u}catch(e){return null}}
+function chartPng(c){if(!window.Chart||!c)return null;const cv=document.createElement('canvas');cv.width=1000;cv.height=400;const col=['#0B7A6B','#8FA79F','#C9D6D2'];let g;try{g=new Chart(cv,{type:'bar',data:{labels:c.labels.map(x=>x.length>26?x.slice(0,25)+'…':x),datasets:c.sets.map((s,i)=>({label:s.l,data:s.d,backgroundColor:col[i%3],borderRadius:4}))},options:{responsive:false,animation:false,devicePixelRatio:1,plugins:{legend:{display:c.sets.length>1}},scales:{x:{ticks:{maxRotation:45,autoSkip:c.labels.length>24,font:{size:c.labels.length>12?9:11}}}}}});const u=cv.toDataURL('image/png');g.destroy();return u}catch(e){return null}}
 async function pdfExport(m,fn){const[h2c,J]=await Promise.all([lib('h2c'),lib('jspdf')]);try{await document.fonts.ready}catch(e){}
 const rtl=S.lang==='ar',W=794,H=1123,PAD=48,host=document.createElement('div');host.style.cssText='position:fixed;left:-12000px;top:0';document.body.appendChild(host);const pages=[];
 const mk_=()=>{const p=document.createElement('div');p.style.cssText=`width:${W}px;height:${H}px;padding:${PAD}px;box-sizing:border-box;background:#fff;color:#13201D;font:13px/1.5 "IBM Plex Sans Arabic",system-ui,sans-serif;position:relative;overflow:hidden;direction:${rtl?'rtl':'ltr'};margin-bottom:20px`;host.appendChild(p);pages.push(p);return p};
@@ -661,9 +724,8 @@ const e_=(tag,css,html)=>{const e=document.createElement(tag);e.style.cssText=cs
 put(e_('div','display:flex;gap:10px;align-items:center;margin-bottom:6px;color:#0B7A6B;font-weight:600;font-size:13px',`${logo().replace(/var\(--ac\)/g,'#0B7A6B').replace(/var\(--bt\)/g,'#fff')}<span>${rtl?'سجل':'Sijill'}</span>`));
 put(e_('h1','font-size:26px;line-height:1.3;margin:10px 0 4px;font-weight:600',esc(m.title)));put(e_('div','color:#56675F;margin-bottom:18px',esc(m.meta)));
 if(m.sum&&m.sum.length)put(e_('ul','margin:0 0 16px;padding-inline-start:20px;line-height:1.9;font-size:14px',m.sum.map(x=>`<li>${esc(x)}</li>`).join('')));
-const img=chartPng(m.chart);if(img)put(e_('img','width:100%;height:auto;margin:6px 0 18px;display:block')).src=img;
 const th='padding:7px 9px;text-align:start;background:#E3EFEC;border-bottom:1px solid #9FB5AE;font-weight:600;white-space:nowrap',td='padding:6px 9px;border-bottom:1px solid #E1E7E4;vertical-align:top;font-size:12px';
-for(const s of m.sheets){const head=()=>`<tr>${s.cols.map(c=>`<th style="${th}">${esc(c)}</th>`).join('')}</tr>`;put(e_('h2','font-size:16px;margin:14px 0 8px;font-weight:600',esc(s.name)));
+for(const s of m.sheets){const head=()=>`<tr>${s.cols.map(c=>`<th style="${th}">${esc(c)}</th>`).join('')}</tr>`;{const hd=e_('h2','font-size:16px;margin:14px 0 8px;font-weight:600',esc(s.name)),im=s.chart?chartPng(s.chart):null;if(im){const w=e_('div','');w.appendChild(hd);const ie=e_('img','width:100%;aspect-ratio:5/2;margin:0 0 10px;display:block');ie.src=im;w.appendChild(ie);put(w)}else put(hd)}
 let tb=e_('table','width:100%;border-collapse:collapse;table-layout:auto',`<thead>${head()}</thead><tbody></tbody>`);put(tb);let body=tb.querySelector('tbody');
 for(const r of s.rows.slice(0,600)){const tr=e_('tr','',r.map(v=>`<td style="${td};${isN(v)?'text-align:end;direction:ltr;font-variant-numeric:tabular-nums':''}">${esc(isN(v)?fmt(v):v)}</td>`).join(''));body.appendChild(tr);if(!fits(tb)){body.removeChild(tr);pg=mk_();tb=e_('table','width:100%;border-collapse:collapse',`<thead>${head()}</thead><tbody></tbody>`);pg.appendChild(tb);body=tb.querySelector('tbody');body.appendChild(tr)}}
 if(pages.length>40)break}
@@ -673,20 +735,25 @@ async function pptxExport(m,fn){const G=await lib('pptx'),p=new G(),rtl=S.lang==
 let s=p.addSlide();s.background={color:'F5F7F6'};s.addShape(p.ShapeType.rect,{x:0,y:0,w:.35,h:7.5,fill:{color:AC}});s.addText(m.title,{...base,x:.9,y:2.3,w:11.5,h:1.5,fontSize:36,bold:true,align:al,valign:'bottom'});s.addText(m.meta||'',{...base,x:.9,y:3.95,w:11.5,h:.7,fontSize:16,color:MU,align:al});
 const head=txt=>s.addText(txt,{...base,x:.6,y:.35,w:12.1,h:.7,fontSize:26,bold:true,align:al});
 if(m.sum&&m.sum.length){s=p.addSlide();head(t('summary'));s.addText(m.sum.map(x=>({text:x,options:{bullet:true,breakLine:true}})),{...base,x:.8,y:1.4,w:11.7,h:5.2,fontSize:20,valign:'top',paraSpaceAfter:12,align:al})}
-if(m.chart){s=p.addSlide();head(t('chart'));s.addChart(p.ChartType.bar,m.chart.sets.map(x=>({name:x.l,labels:m.chart.labels,values:x.d})),{x:.6,y:1.3,w:12.1,h:5.7,barDir:'col',chartColors:[AC,'8FA79F','C9D6D2'],showLegend:m.chart.sets.length>1,legendPos:'b',catAxisLabelFontSize:12,valAxisLabelFontSize:12,valGridLine:{color:'E1E7E4',size:.5},catGridLine:{style:'none'},showValue:false})}
-let count=0;for(const sh of m.sheets){const per=sh.cols.length>8?9:13,fs=sh.cols.length>8?9:sh.cols.length>5?11:12,chunks=Math.max(1,Math.ceil(sh.rows.length/per));
+let count=0;for(const sh of m.sheets){if(sh.chart&&count<80){s=p.addSlide();head(sh.name);s.addChart(p.ChartType.bar,sh.chart.sets.map(x=>({name:x.l,labels:sh.chart.labels,values:x.d})),{x:.6,y:1.3,w:12.1,h:5.7,barDir:'col',chartColors:[AC,'8FA79F','C9D6D2'],showLegend:sh.chart.sets.length>1,legendPos:'b',catAxisLabelFontSize:sh.chart.labels.length>12?9:12,valAxisLabelFontSize:12,valGridLine:{color:'E1E7E4',size:.5},catGridLine:{style:'none'},showValue:false});count++}
+const per=sh.cols.length>8?9:13,fs=sh.cols.length>8?9:sh.cols.length>5?11:12,chunks=Math.max(1,Math.ceil(sh.rows.length/per));
 for(let i=0;i<chunks&&count<80;i++,count++){s=p.addSlide();head(sh.name+(chunks>1?` (${i+1}/${chunks})`:''));
 const hdr=sh.cols.map(c=>({text:String(c),options:{bold:true,fill:{color:'E3EFEC'},color:INK,align:al,rtlMode:rtl,fontFace:F,fontSize:fs}})),rows=sh.rows.slice(i*per,(i+1)*per).map(r=>sh.cols.map((_,ci)=>{const v=r[ci]??'';return{text:isN(v)?fmt(v):String(v),options:{align:isN(v)?'right':al,fontFace:F,fontSize:fs,color:INK,rtlMode:rtl}}}));
 s.addTable([hdr,...rows],{x:.6,y:1.3,w:12.1,border:{type:'solid',pt:.5,color:'D5DEDB'},valign:'middle',margin:[.04,.08,.04,.08]})}}
 await p.writeFile({fileName:fn+'.pptx'})}
 /* ---------- presentation ---------- */
-function startPresent(){const c=caps(S.doc);if(!c.present){toast(c.why);return}sl=0;$('#ov').innerHTML='<div class="pres" role="dialog" aria-modal="true"></div>';slide()}
-function slide(){const d=S.doc,k=keyInfo(d),p=$('.pres');if(!p)return;if(ch){ch.destroy();ch=null}
-const B=[`<h1 class="big">${esc(nm(d))}</h1><p class="mu" style="font-size:20px;margin-top:14px">${esc(k.label)}: ${fmt(conv(k.val,d.ccy))} ${S.base}</p>`,`<div class="cw" style="height:min(60vh,420px)"><canvas id="pc"></canvas></div>`,`<ul class="lst">${sumLines(d).map(x=>`<li><span class="dot"></span><span>${esc(x)}</span></li>`).join('')}</ul>`];
-const rtl=S.lang==='ar';p.innerHTML=`<div class="row"><span class="sp"></span><button class="ib" onclick="endPresent()" aria-label="${t('cls')}">${ic('x')}</button></div><div class="st" key="${sl}">${B[sl]}</div><div class="row" style="justify-content:center"><button class="ib" ${sl?'':'disabled'} onclick="sl--;slide()" aria-label="prev">${ic(rtl?'chr':'chl')}</button><span class="mu">${sl+1} / 3</span><button class="ib" ${sl<2?'':'disabled'} onclick="sl++;slide()" aria-label="next">${ic(rtl?'chl':'chr')}</button></div>`;
-if(sl===1){const c=chartData(d);mk($('#pc'),c.labels,c.sets,S.ct,false)}}
-function endPresent(){$('#ov').innerHTML='';if(ch){ch.destroy();ch=null}if(S.tab==='doc'&&S.mode==='chart')modeV()}
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){if($('#pop')){closeDD();return}if(document.body.classList.contains('dr')){drawer(0);return}if($('.pres'))endPresent();else $('#ov').innerHTML=''}if($('.pres')){const rtl=S.lang==='ar';if(e.key==='ArrowRight'||e.key==='ArrowLeft'){const nx=sl+(e.key==='ArrowRight'?(rtl?-1:1):(rtl?1:-1));if(nx>=0&&nx<3){sl=nx;slide()}}}});
+function beginPresent(list){const d=S.doc;PSL={si0:d.si,list};sl=0;$('#ov').innerHTML='<div class="pres" role="dialog" aria-modal="true"></div>';slide()}
+function startPresent(){const d=S.doc;if(!d)return;if(!presOK(d)){toast(d.status==='review'?t('whyConf'):t('whyNum'));return}
+if(d.sheets.length<2){beginPresent([d.si]);return}if(S.mode==='edit')readEd();syncSheet(d);
+secDlg({title:t('secPresT'),items:secItems(d.sheets,hasNum),sel:hasNum(d.sheets[d.si])?[d.si]:[],actions:[{id:'go',label:t('present'),icon:'pres',min:1}]}).then(r=>{if(r&&r.id==='go'&&S.doc===d)beginPresent(r.sel)})}
+const psTotal=()=>PSL?PSL.list.length*3:3;
+function slide(){const d=S.doc,p=$('.pres');if(!p)return;if(ch){ch.destroy();ch=null}
+const si=PSL?PSL.list[Math.floor(sl/3)]:d.si,kd=sl%3,total=psTotal();setSheet(d,si);const k=keyInfo(d),sn=d.sheets.length>1?shLab(d.sheets[si],si):'',cap=sn?`<p class="mu sm" style="margin-bottom:8px">${esc(sn)}</p>`:'';
+const B=[`<h1 class="big">${esc(nm(d))}</h1>${sn?`<p style="font-size:22px;margin-top:10px;color:var(--ac);font-weight:600">${esc(sn)}</p>`:''}<p class="mu" style="font-size:20px;margin-top:14px">${esc(k.label)}: ${fmt(conv(k.val,d.ccy))} ${S.base}</p>`,`${cap}<div class="cw" style="height:min(60vh,420px)"><canvas id="pc"></canvas></div>`,`${cap}<ul class="lst">${sumLines(d).map(x=>`<li><span class="dot"></span><span>${esc(x)}</span></li>`).join('')}</ul>`];
+const rtl=S.lang==='ar';p.innerHTML=`<div class="row"><span class="sp"></span><button class="ib" onclick="endPresent()" aria-label="${t('cls')}">${ic('x')}</button></div><div class="st" key="${sl}">${B[kd]}</div><div class="row" style="justify-content:center"><button class="ib" ${sl?'':'disabled'} onclick="sl--;slide()" aria-label="prev">${ic(rtl?'chr':'chl')}</button><span class="mu">${sl+1} / ${total}</span><button class="ib" ${sl<total-1?'':'disabled'} onclick="sl++;slide()" aria-label="next">${ic(rtl?'chl':'chr')}</button></div>`;
+if(kd===1){const c=chartData(d);mk($('#pc'),c.labels,c.sets,S.ct,false)}}
+function endPresent(){$('#ov').innerHTML='';if(ch){ch.destroy();ch=null}const d=S.doc,ps=PSL;PSL=null;if(ps&&d&&d.si!==ps.si0){setSheet(d,ps.si0);if(S.tab==='doc'){detailV();dockU();return}}if(S.tab==='doc'&&S.mode==='chart')modeV()}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){if($('#pop')){closeDD();return}if(document.body.classList.contains('dr')){drawer(0);return}if($('.pres'))endPresent();else $('#ov').innerHTML=''}if($('.pres')){const rtl=S.lang==='ar';if(e.key==='ArrowRight'||e.key==='ArrowLeft'){const nx=sl+(e.key==='ArrowRight'?(rtl?-1:1):(rtl?1:-1));if(nx>=0&&nx<psTotal()){sl=nx;slide()}}}});
 /* drag files anywhere on the page */
 let dc=0;const hasF=e=>e.dataTransfer&&[...e.dataTransfer.types].includes('Files');
 addEventListener('dragenter',e=>{if(!hasF(e))return;e.preventDefault();dc++;document.body.classList.add('dg')});
